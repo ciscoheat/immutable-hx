@@ -1,0 +1,4 @@
+/bin
+.vagrant
+node_modules
+*.sublime-workspace

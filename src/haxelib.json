@@ -1,0 +1,11 @@
+{
+  "name": "immutable",
+  "url": "https://github.com/ciscoheat/immutable-hx",
+  "description": "Enforce immutability.",
+  "license": "MIT",
+  "contributors": ["ciscoheat"],
+  "version": "0.1.0",
+  "releasenote": "Initial version.",
+  "tags": ["cross", "immutable", "fp"],
+  "dependencies": {}
+}
