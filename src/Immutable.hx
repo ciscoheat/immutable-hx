@@ -51,12 +51,12 @@ class ImmutableBuilder
 		});		
 	}
 	
-	function assignmentError(e : Expr) Context.error("Cannot make assignments in an immutable class without marking with @mutable.", e.pos);
+	function assignmentError(e : Expr) Context.error("Cannot make assignments in an immutable class without marking the var with @mutable.", e.pos);
 	
 	function preventAssignments(inConstructor : Bool, mutables : Array<String>, e : Expr) {
 		switch e.expr {
 			case EBlock(exprs):
-				var newMutables = new Array<String>();
+				var newMutables = mutables.copy();
 				for (e2 in exprs) preventAssignments(inConstructor, newMutables, e2);
 				return;
 			
@@ -72,10 +72,17 @@ class ImmutableBuilder
 						assignmentError(e);
 					} 					
 				}
-
-			case EMeta(s, { expr: EVars(vars), pos: _ } ) if (s.name == "mutable"):
+				
+			case EVars(vars):
+				for (v in vars) mutables.remove(v.name);
+				
+			case EMeta(s, { expr: EVars(vars), pos: _ }) if (s.name == "mutable"):
 				for (v in vars) mutables.push(v.name);
 				e.expr = EVars(vars); // Need to remove the meta, otherwise it won't compile
+				
+				// Run through the vars expr separately, to avoid them being muted again in the EVars switch
+				for (v in vars) preventAssignments(inConstructor, mutables, v.expr);
+				return;
 				
 			case _: 
 		}
