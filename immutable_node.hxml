@@ -1,0 +1,8 @@
+-lib buddy
+-D nodejs
+-D buddy_colors
+-cp src 
+-cp tests
+-debug
+-main RunTests
+-js bin/immutable.js

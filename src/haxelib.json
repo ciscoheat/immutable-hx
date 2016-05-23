@@ -4,8 +4,8 @@
   "description": "Enforce immutability.",
   "license": "MIT",
   "contributors": ["ciscoheat"],
-  "version": "0.3.0",
-  "releasenote": "Warning emitted when allowing a field to be mutable.",
+  "version": "0.4.0",
+  "releasenote": "Now handles macro rewriting.",
   "tags": ["cross", "immutable", "fp"],
   "dependencies": {}
 }

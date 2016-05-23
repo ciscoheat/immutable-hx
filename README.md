@@ -29,6 +29,8 @@ class YourClass implements Immutable
 }
 ```
 
-Please open an issue if you happened to trick the library, or if you think something is conceptually or semantically wrong.
+It's using macros for enforcing this at compile-time, so it won't slow down your code.
+
+Please open an issue if you happened to trick the library, or if you think something is conceptually or semantically wrong. Using [Reflect](http://api.haxe.org/Reflect.html) isn't tricking though, it's intentional.
 
 [![Build Status](https://travis-ci.org/ciscoheat/immutable-hx.svg?branch=master)](https://travis-ci.org/ciscoheat/immutable-hx)
