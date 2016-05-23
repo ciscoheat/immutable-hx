@@ -1,4 +1,5 @@
 
+import sys.FileSystem;
 import sys.io.File;
 
 // Start from top directory with
@@ -39,6 +40,8 @@ class RunFailureTests {
 		}
 
 		File.copy(bak, src);
+		FileSystem.deleteFile(bak);
+		
 		Sys.println("*** Completed, status: " + status);
 
 		Sys.exit(status);

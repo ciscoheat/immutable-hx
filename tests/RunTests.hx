@@ -1,5 +1,8 @@
 using buddy.Should;
 
+// Every line in this file starting with TEST: should create a failure if uncommented.
+// This is tested with RunFailureTests.hx
+
 class RunTests extends buddy.SingleSuite
 {	
 	public function new() {
@@ -34,7 +37,7 @@ class RunTests extends buddy.SingleSuite
 }
 
 class Mutable {
-	public static var staticMutable = 0;
+	public static var staticMutableVar = 0;
 	
 	public var publicVar = 0;
 	
@@ -57,8 +60,7 @@ class VeryImmutable implements Immutable {
 	//TEST: public var setter2(default, default) : Int;
 	
 	var privateVar : String;
-	
-	var t : Mutable;
+	var t : Mutable; // To keep the code without optimizations
 	
 	public function new() {
 		this.t = new Mutable();
@@ -69,18 +71,22 @@ class VeryImmutable implements Immutable {
 	public function test(start) {
 		// ----- Static tests -----
 		staticMutableVar = 1;
+		VeryImmutable.staticMutableVar = 2;
 		//TEST: staticVar = 1;
 		//TEST: VeryImmutable.staticVar = 1;
 		
 		// ----- Instance tests -----
 		mutableVar = "mutable";
+		this.mutableVar = "mutable";
 		//TEST: publicVar = "illegal";
+		//TEST: privateVar = "illegal";
 		
 		// ----- Basic assignment -----
-		var mutableVar = 999;		
+		var mutableVar = 999;
 		var test = publicVar;		
 		var number = 0;
 		var number2 = number + 123;
+		//TEST: mutableVar = 1000+start; t.eat(mutableVar);
 		//TEST: test = Std.string(start); t.eat(test);
 		//TEST: number += (start + 123); t.eat(number);
 		
@@ -92,11 +98,13 @@ class VeryImmutable implements Immutable {
 		// ----- Calling other objects -----
 		var mutable = new Mutable();
 		mutable.publicVar = 1;
-		Mutable.staticMutable = 1;
+		Mutable.staticMutableVar = 1;
 
-		// ----- Assigning to this and calling -----
+		// ----- Assigning this to a local var -----
 		var self = this;
 		//TEST: self.publicVar = "illegal";
+		var self2 = function() return this;
+		//TEST: self2().privateVar = "illegal";
 		
 		// ----- Mutable var -----
 		@mutable var exception = start;

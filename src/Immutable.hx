@@ -110,7 +110,6 @@ class ImmutableBuilder
 			case EVars(vars):
 				for (v in vars) mutables.remove(v.name);
 				
-			// Rename all mutable constants, so they won't be checked later
 			case EConst(CIdent(s)) if(mutables.has(s)): 
 				e.expr = EConst(CIdent('__mutable_$s'));
 				
@@ -119,10 +118,11 @@ class ImmutableBuilder
 				// Run them before setting mutables, because the var expressions aren't in that scope.
 				for (v in vars) renameMutableVars(inConstructor, mutables, v.expr);
 				
-				// Set mutables for the current scope
+				// Set mutables for the current scope and rename the var so
+				// it can be identified as mutable.
 				for (v in vars) if (!mutables.has(v.name)) {
 					mutables.push(v.name);
-					v.name = '__mutable_' + v.name;
+					v.name = '__mutable_${v.name}';
 				}
 				
 				// Need to remove the meta, otherwise it won't compile
@@ -158,7 +158,9 @@ class ImmutableBuilder
 							false;
 					}
 					
-					if(!skip) switch fieldExpr {
+					if (!skip) switch fieldExpr {
+						
+						// Testing instance field ("this") assignments
 						case TConst(TThis):
 							switch fa {
 								case FInstance(_, _, cf):
@@ -167,41 +169,20 @@ class ImmutableBuilder
 										typedAssignmentError(e);
 									
 								case _: 
-									typedAssignmentError(e); null;
+									typedAssignmentError(e);
 							}
 							
-						case TTypeExpr(m):
-							switch m {
-								case TClassDecl(c):
-									var cls = c.get();
-									if (cls.pack.toDotPath(cls.name) == className) {
-										switch fa {
-											case FStatic(_, cf):
-												var field = cf.get().name;
-												if (!mutableFieldNames.has(field)) typedAssignmentError(e);
-											case _:
-												// Not the same class, ignore.
-										}
-									}
-								case _:
-									typedAssignmentError(e); null;
-							}
-							
-						case TLocal(v):
+						// Testing static field assignments
+						case TTypeExpr(_):
 							switch fa {
-								case FInstance(c, _, cf):
-									var cls = c.get();
-									if (cls.pack.toDotPath(cls.name) == className) {
-										var field = cf.get().name;
-										if (!mutableFieldNames.has(field) && !(inConstructor && fieldNames.has(field)))
-											typedAssignmentError(e);
-									}
+								case FStatic(_, cf):
+									var field = cf.get().name;
+									if (!mutableFieldNames.has(field)) typedAssignmentError(e);
 								case _:
-									// Not sure about this case...
+									typedAssignmentError(e);
 							}
-							
 						case _:
-							typedAssignmentError(e); null;
+							typedAssignmentError(e);
 					}
 					
 				case TLocal(v):

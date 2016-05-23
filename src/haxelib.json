@@ -5,7 +5,7 @@
   "license": "MIT",
   "contributors": ["ciscoheat"],
   "version": "0.5.0",
-  "releasenote": "Compatible with 3.3.",
+  "releasenote": "More tests, compatible with 3.3.",
   "tags": ["cross", "immutable", "fp"],
   "dependencies": {}
 }
