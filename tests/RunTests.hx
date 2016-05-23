@@ -9,20 +9,20 @@ class RunTests extends buddy.SingleSuite
 			beforeEach( { i = new VeryImmutable(); } );
 			
 			it("should not allow field assignments outside constructor", {
-				i.test().should.be(234);
+				i.test().should.be(456);
 			});
 			
 			it("should transform all public class vars to prop(default, null)", {
 				//i.publicVar = "illegal";
-				i.test().should.be(234);
+				i.test().should.be(456);
 			});
 			
 			it("should not allow any non-var assignments", {
-				i.test().should.be(234);
+				i.test().should.be(456);
 			});
 			
 			it("should allow mutable vars when using @mutable", {
-				i.test().should.be(234);
+				i.test().should.be(456);
 				i.mutableVar.should.be("mutable");
 				
 				i.mutableVar = "ok";
@@ -68,12 +68,17 @@ class VeryImmutable implements Immutable {
 		exception = 234;
 
 		if (true) {
+			exception = 345;
+			
 			var exception = 999;
+			//exception = 888;
 			
 			if (!false) {
 				//exception = 456;
 			}
 		}
+		
+		exception += 111;
 		
 		return exception;
 	}
