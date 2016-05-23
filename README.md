@@ -9,6 +9,7 @@ class YourClass implements Immutable
 {
 	public var test : String;
 
+	// Fields can be mutable, but will emit a compiler warning:
 	@mutable public var specialCase : String;
 
 	public function new() {

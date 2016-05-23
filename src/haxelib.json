@@ -4,8 +4,8 @@
   "description": "Enforce immutability.",
   "license": "MIT",
   "contributors": ["ciscoheat"],
-  "version": "0.2.1",
-  "releasenote": "A few more scope fixes.",
+  "version": "0.3.0",
+  "releasenote": "Warning emitted when allowing a field to be mutable.",
   "tags": ["cross", "immutable", "fp"],
   "dependencies": {}
 }

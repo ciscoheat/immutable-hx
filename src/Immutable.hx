@@ -17,14 +17,16 @@ class ImmutableBuilder
 	//////////////////////////////////////////////////////////////////////////
 	
 	var fieldNames : Array<String>;
-	var mutableFields : Array<String>;
+	var mutableFieldNames : Array<String>;
 	
 	function new() {
-		fieldNames = [for (field in Context.getBuildFields()) field.name];
+		this.fieldNames = [for (field in Context.getBuildFields()) field.name];
 		
-		mutableFields = [for (field in Context.getBuildFields()) 
-			if (field.meta.find(function(m) return m.name == "mutable") != null)
-				field.name
+		this.mutableFieldNames = [for (field in Context.getBuildFields()) 
+			if (field.meta.find(function(m) return m.name == "mutable") != null) {
+				Context.warning('Field ${field.name} marked as mutable in immutable class', field.pos);
+				field.name;
+			}
 		];
 	}
 	
@@ -33,13 +35,13 @@ class ImmutableBuilder
 			case FVar(t, e):
 				if (e != null) preventAssignments(false, [], e);
 				
-				if(!mutableFields.has(field.name))
+				if(!mutableFieldNames.has(field.name))
 					field.kind = FProp('default', 'null', t, e);
 					
 				field;
 			
 			case FProp(get, set, t, e):
-				if (set != 'null' && set != 'never' && !mutableFields.has(field.name)) 
+				if (set != 'null' && set != 'never' && !mutableFieldNames.has(field.name)) 
 					Context.error("Setters not allowed in an immutable class. Use only 'null' or 'never'.", field.pos);
 					
 				if (e != null) preventAssignments(false, [], e);
@@ -56,14 +58,14 @@ class ImmutableBuilder
 	function preventAssignments(inConstructor : Bool, mutables : Array<String>, e : Expr) {
 		switch e.expr {
 			case EBlock(exprs):
-				var newMutables = mutables.copy();
-				for (e2 in exprs) preventAssignments(inConstructor, newMutables, e2);
+				var newMutableScope = mutables.copy();
+				for (e2 in exprs) preventAssignments(inConstructor, newMutableScope, e2);
 				return;
 			
 			case EBinop(OpAssign, e1, e2) | EBinop(OpAssignOp(_), e1, e2):
 				var field = e1.toString();
 				
-				if (!mutableFields.has(field) && !mutables.has(field)) {
+				if (!mutableFieldNames.has(field) && !mutables.has(field)) {
 					if (inConstructor) {
 						var classField = field.startsWith("this.") ? field.substr(5) : field;
 						if (!fieldNames.has(classField) && !mutables.has(field)) assignmentError(e);					

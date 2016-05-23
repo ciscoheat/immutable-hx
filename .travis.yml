@@ -22,3 +22,5 @@ install:
 script:
   - haxelib run travix neko
   - haxelib run travix node
+  - haxelib run travix cpp
+  
