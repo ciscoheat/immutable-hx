@@ -9,20 +9,20 @@ class RunTests extends buddy.SingleSuite
 			beforeEach( { i = new VeryImmutable(); } );
 			
 			it("should not allow field assignments outside constructor", {
-				i.test().should.be(456);
+				i.test(123).should.be(456);
 			});
 			
 			it("should transform all public class vars to prop(default, null)", {
-				i.test().should.be(456);
+				i.test(123).should.be(456);
 				//TEST: i.publicVar = "illegal";
 			});
 			
 			it("should not allow any non-var assignments", {
-				i.test().should.be(456);
+				i.test(123).should.be(456);
 			});
 			
 			it("should allow mutable vars when using @mutable", {
-				i.test().should.be(456);
+				i.test(123).should.be(456);
 				i.mutableVar.should.be("mutable");
 				
 				i.mutableVar = "ok";
@@ -38,7 +38,12 @@ class Mutable {
 	
 	public var publicVar = 0;
 	
-	public function new() {}
+	public function new() { }
+
+	// 3.3 compiler is too good at optimizing, this is required to keep the test code!
+	public function eat(o : Dynamic) {
+		trace(o);
+	}
 }
 
 class VeryImmutable implements Immutable {
@@ -53,12 +58,15 @@ class VeryImmutable implements Immutable {
 	
 	var privateVar : String;
 	
+	var t : Mutable;
+	
 	public function new() {
+		this.t = new Mutable();
 		this.publicVar = "set";
-		privateVar = "set";
+		privateVar = "set";		
 	}
 	
-	public function test() {
+	public function test(start) {
 		// ----- Static tests -----
 		staticMutableVar = 1;
 		//TEST: staticVar = 1;
@@ -66,20 +74,20 @@ class VeryImmutable implements Immutable {
 		
 		// ----- Instance tests -----
 		mutableVar = "mutable";
-		//TEST: publicVar = "illegal";		
+		//TEST: publicVar = "illegal";
 		
 		// ----- Basic assignment -----
 		var mutableVar = 999;		
 		var test = publicVar;		
 		var number = 0;
 		var number2 = number + 123;
-		//TEST: test = "illegal";		
-		//TEST: number += 123;
+		//TEST: test = Std.string(start); t.eat(test);
+		//TEST: number += (start + 123); t.eat(number);
 		
 		// ----- Method calls -----
 		var testArray = [];
 		testArray.push(1);
-		//TEST: testArray = [];
+		//TEST: testArray = []; t.eat(testArray);
 		
 		// ----- Calling other objects -----
 		var mutable = new Mutable();
@@ -91,28 +99,28 @@ class VeryImmutable implements Immutable {
 		//TEST: self.publicVar = "illegal";
 		
 		// ----- Mutable var -----
-		@mutable var exception = 123;
-		exception = 234;
+		@mutable var exception = start;
+		exception = exception + 77;
 		
 		if (true) {
 			// In different scope
-			exception = 345;
+			exception += 100;
 			
 			// New, immutable var in different scope
 			var exception = 999;
-			//TEST: exception = 888;
+			//TEST: exception = 888 + start; t.eat(exception);
 			
 			if (!false) {
 				// Yet another scope
-				//TEST: exception = 456;
+				//TEST: exception = 456 - start; t.eat(exception);
 			}
 		}
 		
 		exception += 100;
 		
 		// ----- Macro rewrites -----
-		Macro.assign(exception, exception + 11);
-		//TEST: Macro.assign(number, 555);
+		Macro.assign(exception, exception + 56);
+		//TEST: Macro.assign(number, 555-start); t.eat(number);
 		
 		return exception;
 	}

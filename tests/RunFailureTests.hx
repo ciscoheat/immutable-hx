@@ -14,17 +14,21 @@ class RunFailureTests {
 
 			var content = File.getContent(src);
 
+			// Extract all test comments
 			var tests = [for(i in 0...content.length-8) {
 				if(content.substr(i, 8) == "//TEST: ") i;
 			}];
 
-			var args = ['-lib','buddy','-cp','tests','-cp','src','-main','RunTests','--interp'];
+			var args = ['tests.hxml', '-cp', 'src', '--interp'];
 			var count = 0;
 
 			for(pos in tests) {
 				Sys.println('Compilation failure test ${++count} of ${tests.length}');
+
+				// Uncomment one test comment at a time
 				File.saveContent(src, content.substr(0, pos) + content.substr(pos+8));
 				if(Sys.command('haxe', args) == 0) {
+					// If it didn't fail, then the test failed.
 					status = 1;
 					break;
 				}

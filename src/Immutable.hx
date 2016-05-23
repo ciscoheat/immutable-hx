@@ -34,25 +34,27 @@ class ImmutableBuilder
 		var className = cls.pack.toDotPath(cls.name);
 		var builder = new ImmutableBuilder(className, fieldNames, mutableFieldNames);
 		
-		immutableTypes.set(className, builder);
+		if(!Context.defined("display")) {
+			immutableTypes.set(className, builder);
 
-		Context.onGenerate(function(types) {
-			if (typesChecked) return;
-			typesChecked = true;
+			Context.onGenerate(function(types) {
+				if (typesChecked) return;
+				typesChecked = true;
 
-			for (type in types) switch type {
-				case TInst(t, _):
-					var inst = t.get();
-					var typeName = inst.pack.toDotPath(inst.name);
-					if (immutableTypes.exists(typeName)) {
-						for (field in inst.fields.get()) if (field.expr() != null) {
-							var builder = immutableTypes.get(typeName);
-							builder.preventTypedAssignments(field.name == "get", field.expr());
+				for (type in types) switch type {
+					case TInst(t, _):
+						var inst = t.get();
+						var typeName = inst.pack.toDotPath(inst.name);
+						if (immutableTypes.exists(typeName)) {
+							for (field in inst.fields.get()) if (field.expr() != null) {
+								var builder = immutableTypes.get(typeName);
+								builder.preventTypedAssignments(field.name == "get", field.expr());
+							}
 						}
-					}
-				case _:
-			}
-		});
+					case _:
+				}
+			});
+		}
 
 		return builder.makeImmutable(buildFields);
 	}
@@ -135,58 +137,81 @@ class ImmutableBuilder
 	
 	function preventTypedAssignments(inConstructor : Bool, e : TypedExpr) {
 		switch e.expr {
-			case TBinop(OpAssign, e1, e2) | TBinop(OpAssignOp(_), e1, e2):
-				switch(e1.expr) {
-					// Test for instance field assignment. Only allowed if mutable or in constructor.
-					case TField({ expr: TConst(TThis), t: _, pos: _ }, fa): 
-						switch fa {
-							case FInstance(_, _, cf):
-								var field = cf.get().name;
-								if (!mutableFieldNames.has(field) && !(inConstructor && fieldNames.has(field)))
-									typedAssignmentError(e);
-								
-							case _: 
-								typedAssignmentError(e); null;
-						}
-					
-					// Test for static field assignment. Only allowed if mutable.
-					case TField({expr: TTypeExpr(m), t: _, pos: _ }, fa):
-						switch m {
-							case TClassDecl(c):
-								var cls = c.get();
-								if (cls.pack.toDotPath(cls.name) == className) {
-									switch fa {
-										case FStatic(_, cf):
-											var field = cf.get().name;
-											if (!mutableFieldNames.has(field)) typedAssignmentError(e);
-										case _:
-											// Not the same class, ignore.
-									}
-								}
-							case _:
-								typedAssignmentError(e); null;
-						}
+			case TBinop(OpAssign, e1, _) | TBinop(OpAssignOp(_), e1, _): switch(e1.expr) {
+				case TField({ expr: fieldExpr, t: t, pos: _ }, fa): 
+					var skip = switch t {
+						// Skip instance references not pointing to the own class
+						case TInst(clsType, _) if (clsType.get().pack.toDotPath(clsType.get().name) != className):
+							true;
 						
-					// Test for local vars assigned to its own class.
-					case TField({expr: TLocal(v), t: t, pos: _}, fa):
-						switch fa {
-							case FInstance(c, _, cf):
-								var cls = c.get();
-								if (cls.pack.toDotPath(cls.name) == className) {
+						// Skip type references not of the same class
+						case TType(defType, _):
+							var name = defType.get().name;
+							var extract = ~/^Class<(.*)>$/;
+
+							if (extract.match(name)) {
+								defType.get().pack.toDotPath(extract.matched(1)) != className;
+							} 
+							else true;
+						
+						case _:
+							false;
+					}
+					
+					if(!skip) switch fieldExpr {
+						case TConst(TThis):
+							switch fa {
+								case FInstance(_, _, cf):
 									var field = cf.get().name;
 									if (!mutableFieldNames.has(field) && !(inConstructor && fieldNames.has(field)))
 										typedAssignmentError(e);
-								}
-							case _:
-								// Not sure about this case...
-						}
-						
-					case TLocal(v):
-						if (!v.name.startsWith("__mutable_")) typedAssignmentError(e);
-						
-					case _: 
-						typedAssignmentError(e); null;
-				}				
+									
+								case _: 
+									typedAssignmentError(e); null;
+							}
+							
+						case TTypeExpr(m):
+							switch m {
+								case TClassDecl(c):
+									var cls = c.get();
+									if (cls.pack.toDotPath(cls.name) == className) {
+										switch fa {
+											case FStatic(_, cf):
+												var field = cf.get().name;
+												if (!mutableFieldNames.has(field)) typedAssignmentError(e);
+											case _:
+												// Not the same class, ignore.
+										}
+									}
+								case _:
+									typedAssignmentError(e); null;
+							}
+							
+						case TLocal(v):
+							switch fa {
+								case FInstance(c, _, cf):
+									var cls = c.get();
+									if (cls.pack.toDotPath(cls.name) == className) {
+										var field = cf.get().name;
+										if (!mutableFieldNames.has(field) && !(inConstructor && fieldNames.has(field)))
+											typedAssignmentError(e);
+									}
+								case _:
+									// Not sure about this case...
+							}
+							
+						case _:
+							typedAssignmentError(e); null;
+					}
+					
+				case TLocal(v):
+					if (!v.name.startsWith("__mutable_")) {
+						typedAssignmentError(e);
+					}
+					
+				case _: 
+					typedAssignmentError(e); null;
+			}				
 			case _: 
 		}
 		
