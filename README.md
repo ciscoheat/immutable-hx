@@ -30,3 +30,5 @@ class YourClass implements Immutable
 ```
 
 Please open an issue if you happened to trick the library, or if you think something is conceptually or semantically wrong.
+
+[![Build Status](https://travis-ci.org/ciscoheat/immutable-hx.svg?branch=master)](https://travis-ci.org/ciscoheat/immutable-hx)
