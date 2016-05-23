@@ -2,7 +2,7 @@
 
 Make your classes immutable with
 
-`haxelib install immutable`
+`haxelib install immutable` and `-lib immutable`
 
 ```haxe
 class YourClass implements Immutable
