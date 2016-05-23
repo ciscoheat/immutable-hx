@@ -160,6 +160,7 @@ class ImmutableBuilder
 											var field = cf.get().name;
 											if (!mutableFieldNames.has(field)) typedAssignmentError(e);
 										case _:
+											// Not the same class, ignore.
 									}
 								}
 							case _:
@@ -177,6 +178,7 @@ class ImmutableBuilder
 										typedAssignmentError(e);
 								}
 							case _:
+								// Not sure about this case...
 						}
 						
 					case TLocal(v):
