@@ -37,7 +37,29 @@ class RunTests extends buddy.SingleSuite
 			it("should work for classes in subpackages", {
 				new AlsoImmutable().test(3.14);
 			});
+			
+			it("should work on static fields", {
+				(function() ImmuTest.mainTest(1)).should.not.throwAnything();
+			});
+			
+			it("should not optimize away vars", {
+				ImmuTest.main().should.be(1);
+			});
 		});
+	}
+}
+
+class ImmuTest implements Immutable {
+	public static function mainTest(start) {
+		var a = 1;
+		//TEST: a = start + 2;
+		VeryImmutable.staticMutableVar = a;
+	}
+	
+	public static function main() {
+		var a = 1;
+		//TEST: Macro.assign(a, 2);
+		return a;
 	}
 }
 
@@ -95,6 +117,8 @@ class VeryImmutable implements Immutable {
 		var test = publicVar;		
 		var number = 0;
 		var number2 = number + 123;
+		//TEST: mutableVar = 1000;
+		//TEST: number += 123;
 		//TEST: mutableVar = 1000+start; t.eat(mutableVar);
 		//TEST: test = Std.string(start); t.eat(test);
 		//TEST: number += (start + 123); t.eat(number);

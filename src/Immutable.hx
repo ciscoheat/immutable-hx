@@ -20,9 +20,12 @@ class ImmutableBuilder
 	static var typesChecked = false;
 	
 	static function build() {
-		var cls = Context.getLocalClass().get();
+		var cls : ClassType = Context.getLocalClass().get();
 		var buildFields = Context.getBuildFields();
-
+		
+		// Remove some optimizations to avoid mutable vars being modified by the compiler
+		cls.meta.add(":analyzer", [macro no_local_dce], cls.pos);
+		
 		var fieldNames = [for (field in buildFields) field.name];
 		var mutableFieldNames = [for (field in buildFields) 
 			if (field.meta.find(function(m) return m.name == "mutable") != null) {
@@ -46,9 +49,16 @@ class ImmutableBuilder
 						var inst = t.get();
 						var typeName = inst.pack.toDotPath(inst.name);
 						if (immutableTypes.exists(typeName)) {
-							for (field in inst.fields.get()) if (field.expr() != null) {
+
+							var allFields = inst.fields.get()
+								.concat(inst.statics.get())								
+								.concat(inst.overrides.map(function(i) return i.get()));
+								
+							if (inst.constructor != null) allFields.push(inst.constructor.get());
+							
+							for (field in allFields) if (field.expr() != null) {
 								var builder = immutableTypes.get(typeName);
-								builder.preventTypedAssignments(field.name == "get", field.expr());
+								builder.preventTypedAssignments(field.name == "new", field.expr());
 							}
 						}
 					case _:
