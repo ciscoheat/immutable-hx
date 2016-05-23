@@ -1,3 +1,4 @@
+import subpack.AlsoImmutable;
 using buddy.Should;
 
 // Every line in this file starting with TEST: should create a failure if uncommented.
@@ -32,6 +33,10 @@ class RunTests extends buddy.SingleSuite
 				VeryImmutable.staticMutableVar = 1;
 				//TEST: VeryImmutable.staticVar = 1;
 			});
+			
+			it("should work for classes in subpackages", {
+				new AlsoImmutable().test(3.14);
+			});
 		});
 	}
 }
@@ -52,6 +57,8 @@ class Mutable {
 class VeryImmutable implements Immutable {
 	public static var staticVar : Int;
 	public var publicVar : String;
+	
+	public var propDef(default, null) : Int;
 	
 	@mutable public static var staticMutableVar : Int;
 	@mutable public var mutableVar : String;
@@ -80,6 +87,8 @@ class VeryImmutable implements Immutable {
 		this.mutableVar = "mutable";
 		//TEST: publicVar = "illegal";
 		//TEST: privateVar = "illegal";
+		//TEST: this.propDef = 1;
+		//TEST: propDef = 1;
 		
 		// ----- Basic assignment -----
 		var mutableVar = 999;
