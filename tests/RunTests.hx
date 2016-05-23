@@ -14,7 +14,7 @@ class RunTests extends buddy.SingleSuite
 			
 			it("should transform all public class vars to prop(default, null)", {
 				i.test().should.be(456);
-				//i.publicVar = "illegal";
+				//TEST: i.publicVar = "illegal";
 			});
 			
 			it("should not allow any non-var assignments", {
@@ -26,10 +26,8 @@ class RunTests extends buddy.SingleSuite
 				i.mutableVar.should.be("mutable");
 				
 				i.mutableVar = "ok";
-				i.mutableVar.should.be("ok");
-				
 				VeryImmutable.staticMutableVar = 1;
-				//VeryImmutable.staticVar = 1;
+				//TEST: VeryImmutable.staticVar = 1;
 			});
 		});
 	}
@@ -50,8 +48,8 @@ class VeryImmutable implements Immutable {
 	@mutable public static var staticMutableVar : Int;
 	@mutable public var mutableVar : String;
 	
-	//public var setter(default, set) : Int;
-	//public var setter2(default, default) : Int;
+	//TEST: public var setter(default, set) : Int;
+	//TEST: public var setter2(default, default) : Int;
 	
 	var privateVar : String;
 	
@@ -63,24 +61,25 @@ class VeryImmutable implements Immutable {
 	public function test() {
 		// ----- Static tests -----
 		staticMutableVar = 1;
-		//staticVar = 1;
+		//TEST: staticVar = 1;
+		//TEST: VeryImmutable.staticVar = 1;
 		
 		// ----- Instance tests -----
 		mutableVar = "mutable";
-		//publicVar = "illegal";		
+		//TEST: publicVar = "illegal";		
 		
 		// ----- Basic assignment -----
 		var mutableVar = 999;		
 		var test = publicVar;		
 		var number = 0;
 		var number2 = number + 123;
-		//test = "illegal";		
-		//number += 123;
+		//TEST: test = "illegal";		
+		//TEST: number += 123;
 		
 		// ----- Method calls -----
 		var testArray = [];
 		testArray.push(1);
-		//testArray = [];
+		//TEST: testArray = [];
 		
 		// ----- Calling other objects -----
 		var mutable = new Mutable();
@@ -89,7 +88,7 @@ class VeryImmutable implements Immutable {
 
 		// ----- Assigning to this and calling -----
 		var self = this;
-		//self.publicVar = "illegal";
+		//TEST: self.publicVar = "illegal";
 		
 		// ----- Mutable var -----
 		@mutable var exception = 123;
@@ -101,11 +100,11 @@ class VeryImmutable implements Immutable {
 			
 			// New, immutable var in different scope
 			var exception = 999;
-			//exception = 888;
+			//TEST: exception = 888;
 			
 			if (!false) {
 				// Yet another scope
-				//exception = 456;
+				//TEST: exception = 456;
 			}
 		}
 		
@@ -113,7 +112,7 @@ class VeryImmutable implements Immutable {
 		
 		// ----- Macro rewrites -----
 		Macro.assign(exception, exception + 11);
-		//Macro.assign(number, 555);
+		//TEST: Macro.assign(number, 555);
 		
 		return exception;
 	}
