@@ -4,8 +4,8 @@
   "description": "Enforce immutability.",
   "license": "MIT",
   "contributors": ["ciscoheat"],
-  "version": "0.2.0",
-  "releasenote": "Fixed mutable vars scope.",
+  "version": "0.2.1",
+  "releasenote": "A few more scope fixes.",
   "tags": ["cross", "immutable", "fp"],
   "dependencies": {}
 }

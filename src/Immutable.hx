@@ -74,14 +74,18 @@ class ImmutableBuilder
 				}
 				
 			case EVars(vars):
-				for (v in vars) mutables.remove(v.name);
+				// New vars, remove mutables in the current scope if they exist
+				for (v in vars) while(mutables.has(v.name)) mutables.remove(v.name);
 				
 			case EMeta(s, { expr: EVars(vars), pos: _ }) if (s.name == "mutable"):
-				for (v in vars) mutables.push(v.name);
-				e.expr = EVars(vars); // Need to remove the meta, otherwise it won't compile
-				
-				// Run through the vars expr separately, to avoid them being muted again in the EVars switch
+				// Run through the vars expressions separately, to avoid them being immutable in the EVars switch.
+				// Run them before setting mutables, because the var expressions aren't in that scope.
 				for (v in vars) preventAssignments(inConstructor, mutables, v.expr);
+				
+				// Set mutables for the current scope
+				for (v in vars) if(!mutables.has(v.name)) mutables.push(v.name);
+				
+				e.expr = EVars(vars); // Need to remove the meta, otherwise it won't compile				
 				return;
 				
 			case _: 
