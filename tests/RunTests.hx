@@ -45,6 +45,11 @@ class RunTests extends buddy.SingleSuite
 			it("should not optimize away vars", {
 				ImmuTest.main().should.be(1);
 			});
+			
+			it("should ignore class fields when implementing ImmutableLocalVars", {
+				var local = new LocalImmutable().test();
+				local.mutable.should.be("ok");
+			});
 		});
 	}
 }
@@ -85,7 +90,7 @@ class VeryImmutable implements Immutable {
 	@mutable public static var staticMutableVar : Int;
 	@mutable public var mutableVar : String;
 	
-	//TEST: public var setter(default, set) : Int;
+	//TEST: public var setter(default, set) : Int; function set_setter(v) return setter = v;
 	//TEST: public var setter2(default, default) : Int;
 	
 	var privateVar : String;
@@ -169,5 +174,38 @@ class VeryImmutable implements Immutable {
 
 class VeryImmutable2 implements Immutable
 {
-	public function new() {}
+	public function new() { }
+
+	// Dynamic methods aren't allowed
+	//TEST: public dynamic function dynamicTest() { return "illegal"; }
+	
+	// Inline should be allowed
+	public inline function test() {
+		return "inline";
+	}
+}
+
+class LocalImmutable implements ImmutableLocalVars
+{
+	public var mutable : String;
+	
+	public function new() {
+		mutable = "true";
+	}
+	
+	public function test() {
+		var test = "ok";
+		//TEST: test = "illegal";
+		mutable = test;
+		return this;
+	}
+}
+
+// Should emit a warning:
+@:analyzer(local_dce)
+class OptimizedImmutable implements Immutable
+{
+	public function new() {
+		
+	}
 }
