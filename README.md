@@ -1,8 +1,10 @@
 # Immutable
 
-Make your classes immutable with
+Make your classes and local vars immutable with
 
-`haxelib install immutable` and `-lib immutable`
+`haxelib install immutable` 
+
+`-lib immutable`
 
 ```haxe
 class YourClass implements Immutable
@@ -42,7 +44,7 @@ let b = 234;   | @mutable var b = 234;
 
 ## For local vars only
 
-If you want your class fields to behave as usual, you can implement `ImmutableLocalVars` instead, and it will only affect methods. This can be useful if you have another library that rewrites the class fields, like [DataClass](https://github.com/ciscoheat/dataclass).
+If you want your class vars and properties to behave as usual, you can implement `ImmutableLocalVars` instead, and it will only affect vars in methods. This can be useful if you have another library that rewrites the class fields, like [DataClass](https://github.com/ciscoheat/dataclass).
 
 ## Problems?
 
