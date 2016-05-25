@@ -131,10 +131,6 @@ class BuildImmutableClass
 		});		
 	}
 	
-	function typedAssignmentError(e : TypedExpr) {
-		Context.error("Cannot make assignments in an immutable class without marking the var with @mutable.", e.pos);
-	}
-	
 	function renameMutableVars(inConstructor : Bool, mutables : Array<String>, e : Expr) {
 		switch e.expr {
 			// New block, create a new scope for mutable vars
@@ -170,6 +166,10 @@ class BuildImmutableClass
 		}
 		
 		e.iter(renameMutableVars.bind(inConstructor, mutables));
+	}
+	
+	function typedAssignmentError(e : TypedExpr) {
+		Context.error("Cannot make assignments in an immutable class without marking the var with @mutable.", e.pos);
 	}
 	
 	function preventAssignments(inConstructor : Bool, e : TypedExpr) {
@@ -224,7 +224,12 @@ class BuildImmutableClass
 					
 				case TLocal(v):
 					if (!v.name.startsWith("__mutable_")) {
-						typedAssignmentError(e);
+						if (!Reflect.hasField(v, "meta")) typedAssignmentError(e);
+
+						// The compiler can generate assignments, trust them for now.
+						var meta : Array<{name: String}> = untyped v.meta;
+						if (!meta.exists(function(m) return m.name == ":compilerGenerated"))
+							typedAssignmentError(e);
 					}
 					
 				case _: 
