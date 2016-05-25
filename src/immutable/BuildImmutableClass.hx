@@ -227,7 +227,12 @@ class BuildImmutableClass
 						if (!Reflect.hasField(v, "meta")) typedAssignmentError(e);
 
 						// The compiler can generate assignments, trust them for now.
-						var meta : Array<{name: String}> = untyped v.meta;
+						#if (haxe_ver < 3.3)
+						var meta : Array<Dynamic> = untyped v.meta;
+						#else
+						// Working properly in 3.3
+						var meta = v.meta.get();
+						#end
 						if (!meta.exists(function(m) return m.name == ":compilerGenerated"))
 							typedAssignmentError(e);
 					}
