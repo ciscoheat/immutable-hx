@@ -244,7 +244,7 @@ class MapSet implements Immutable
 	
 	public function test() {
 		var localmap = new Map<Int, String>();
-		var fullmap = new Map<MutableArguments, MapSet>();
+		var fullmap = new Map<OptimizedImmutable, MapSet>();
 		
 		map.set("a", "a");
 		map.get("a");
@@ -254,9 +254,9 @@ class MapSet implements Immutable
 		localmap.get(1);
 		localmap.remove(1);
 		
-		var m = new MutableArguments();
+		var m = new OptimizedImmutable();
 		fullmap.set(m, new MapSet());
-		fullmap.set(new MutableArguments(), new MapSet());
+		fullmap.set(new OptimizedImmutable(), new MapSet());
 		fullmap.get(m);
 		fullmap.remove(m);
 	}
