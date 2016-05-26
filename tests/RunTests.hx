@@ -51,9 +51,11 @@ class RunTests extends buddy.SingleSuite
 				local.mutable.should.be("ok");
 			});
 			
+			#if (haxe_ver >= 3.3)
 			it("should handle @mutable on function arguments", {
 				new MutableArguments().test("hello", "immutable").should.be("HELLO");
 			});
+			#end
 			
 			it("should allow map.set calls on generic maps.", {
 				(function() new MapSet().test()).should.not.throwAnything();
@@ -216,6 +218,7 @@ class OptimizedImmutable implements Immutable
 	public function new() {}
 }
 
+#if (haxe_ver >= 3.3)
 class MutableArguments implements Immutable
 {
 	public function new() { }
@@ -230,6 +233,7 @@ class MutableArguments implements Immutable
 		return a;
 	}
 }
+#end
 
 // Maps are abstracted, special care must be taken to allow their assignments.
 class MapSet implements Immutable
