@@ -228,7 +228,7 @@ class MutableArguments implements Immutable
 			b = b.toUpperCase();
 			return b;
 		}
-		//TEST: b = a;
+		//xTEST: b = a; // Cannot use this test because of the #if
 		a = modify(a);
 		return a;
 	}

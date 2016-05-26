@@ -218,6 +218,13 @@ class BuildImmutableClass
 	var safeLocals = new Map<Int, Bool>();
 	
 	function preventAssignments(inConstructor : Bool, e : TypedExpr) {
+		function failIfNotMap(t : ClassType) {
+			var mapType = ~/^haxe\.ds\.[A-Z]\w+Map$/;
+			
+			if (!mapType.match(t.pack.toDotPath(t.name)))
+				typedAssignmentError(e);
+		}
+		
 		switch e.expr {
 			case TBinop(OpAssign, e1, e2) | TBinop(OpAssignOp(_), e1, e2): switch(e1.expr) {
 				case TField({ expr: fieldExpr, t: t, pos: _ }, fa): 
@@ -269,18 +276,18 @@ class BuildImmutableClass
 					
 				// Test for generic Map.set, for example StringMap
 				// since it's abstract, the set method is replaced by an assignment.
-				case TArray({expr: TField(e3, _), t:_, pos:_}, _):
+				case TArray({ expr: TField(e3, _), t: t, pos:_ }, _):
 					switch e3.t {
-						case TInst(t, params): 
-							// Allow haxe.ds.*Map
-							var mapType = ~/^haxe\.ds\.[A-Z]\w+Map$/;
-							
-							if (!mapType.match(Std.string(t)))
-								typedAssignmentError(e);
-								
-						case _:							
-							typedAssignmentError(e);
+						case TInst(t2, _): failIfNotMap(t2.get());								
+						case _:	typedAssignmentError(e);
 					}
+				
+				// Flash stores Maps differently.
+				case TArray({ expr: TLocal(_), t: t, pos: _ }, _):
+					switch t {
+						case TInst(t2, _): failIfNotMap(t2.get());
+						case _: typedAssignmentError(e);
+					}					
 					
 				case TLocal(v):
 					if (safeLocals.exists(v.id)) return;
