@@ -239,8 +239,12 @@ class MutableArguments implements Immutable
 class MapSet implements Immutable
 {
 	var map = new Map<String, String>();
+	var fullClassmap : Map<OptimizedImmutable, MapSet>;
+	var mixed = new Map<Int, MapSet>();
 	
-	public function new() { }
+	public function new() {
+		fullClassmap = new Map<OptimizedImmutable, MapSet>();
+	}
 	
 	public function test() {
 		var localmap = new Map<Int, String>();
@@ -249,15 +253,32 @@ class MapSet implements Immutable
 		map.set("a", "a");
 		map.get("a");
 		map.remove("a");
-		
+
+		mixed.set(1, new MapSet());
+		mixed.get(1);
+		mixed.remove(1);
+
 		localmap.set(1, "1");
 		localmap.get(1);
 		localmap.remove(1);
 		
 		var m = new OptimizedImmutable();
+		
 		fullmap.set(m, new MapSet());
 		fullmap.set(new OptimizedImmutable(), new MapSet());
 		fullmap.get(m);
 		fullmap.remove(m);
+		
+		fullClassmap.set(m, new MapSet());
+		fullClassmap.set(new OptimizedImmutable(), new MapSet());
+		fullClassmap.get(m);
+		fullClassmap.remove(m);		
+		
+		// Try reassigning the maps
+		//TEST: localmap = new Map<Int, String>();
+		//TEST: fullmap = new Map<OptimizedImmutable, MapSet>();
+		//TEST: this.map = new Map<String, String>();
+		//TEST: fullClassmap = new Map<OptimizedImmutable, MapSet>();
+		//TEST: mixed = new Map<Int, MapSet>();
 	}
 }
