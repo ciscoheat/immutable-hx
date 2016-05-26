@@ -41,6 +41,8 @@ class BuildImmutableClass
 			Context.onGenerate(function(types) {
 				if (typesChecked) return;
 				typesChecked = true;
+				
+				var assignmentErrors = [];
 
 				for (type in types) switch type {
 					case TInst(t, _):
@@ -86,9 +88,22 @@ class BuildImmutableClass
 									builder.preventAssignments(field.name == "new", field.expr());
 								}
 							}
+							
+							for (p in builder.assignmentErrors) assignmentErrors.push(p);							
 						}
 					case _:
 				}
+				
+				if (assignmentErrors.length > 0) {
+					var errorMessage = "Cannot make assignments in an immutable class without marking the var with @mutable.";
+					
+					assignmentErrors.sort(function(a, b) return Std.string(a) < Std.string(b) ? 1 : -1);
+					
+					for (pos in assignmentErrors.slice(0, -1))
+						Context.warning(errorMessage, pos);
+						
+					Context.error(errorMessage, assignmentErrors[assignmentErrors.length-1]);
+				}				
 			});
 		}
 
@@ -96,7 +111,9 @@ class BuildImmutableClass
 	}
 	
 	//////////////////////////////////////////////////////////////////////////
-	
+
+	public var assignmentErrors(default, null) = new Array<Position>();
+
 	var className : String;
 	var fieldNames : Array<String>;
 	var mutableFieldNames : Array<String>;
@@ -126,9 +143,22 @@ class BuildImmutableClass
 				field;
 				
 			case FFun(f):
-				if (f.expr != null) renameMutableVars(field.name == "new", [], f.expr);
+				// Test if some method arguments are marked with mutable
+				var mutables = mutableFunctionArguments(f.args);
+				if (f.expr != null) renameMutableVars(field.name == "new", mutables, f.expr);
 				field;
 		});		
+	}
+	
+	// NOTE: Also modifies the argument name, if @mutable
+	function mutableFunctionArguments(args : Array<FunctionArg>) : Array<String> {
+		return [for (arg in args) {
+			if (arg.meta.exists(function(m) return m.name == "mutable")) {
+				var originalName = arg.name;
+				arg.name = '__mutable_' + arg.name;
+				originalName;		
+			}
+		}];		
 	}
 	
 	function renameMutableVars(inConstructor : Bool, mutables : Array<String>, e : Expr) {
@@ -139,6 +169,14 @@ class BuildImmutableClass
 				for (e2 in exprs) renameMutableVars(inConstructor, newMutableScope, e2);
 				return;
 			
+			case EFunction(_, f):
+				if (f.expr != null) renameMutableVars(
+					inConstructor, 
+					mutables.concat(mutableFunctionArguments(f.args)), 
+					f.expr
+				);
+				return;
+				
 			// New vars, remove mutables in the current scope if they exist
 			case EVars(vars):
 				for (v in vars) mutables.remove(v.name);
@@ -169,12 +207,15 @@ class BuildImmutableClass
 	}
 	
 	function typedAssignmentError(e : TypedExpr) {
-		Context.error("Cannot make assignments in an immutable class without marking the var with @mutable.", e.pos);
+		//trace("============ error"); trace(e.expr); trace(e.t);
+		assignmentErrors.push(e.pos);
 	}
+	
+	var safeLocals = new Map<Int, Bool>();
 	
 	function preventAssignments(inConstructor : Bool, e : TypedExpr) {
 		switch e.expr {
-			case TBinop(OpAssign, e1, _) | TBinop(OpAssignOp(_), e1, _): switch(e1.expr) {
+			case TBinop(OpAssign, e1, e2) | TBinop(OpAssignOp(_), e1, e2): switch(e1.expr) {
 				case TField({ expr: fieldExpr, t: t, pos: _ }, fa): 
 					var skipClassFieldTests = if(onlyLocalVars) true else switch t {
 						// Skip instance references not pointing to the own class
@@ -222,9 +263,40 @@ class BuildImmutableClass
 							typedAssignmentError(e);
 					}
 					
+				// Test for generic Map.set, for example StringMap
+				// since it's abstract, the set method is replaced by an assignment.
+				case TArray({expr: TField(e3, _), t:_, pos:_}, _):
+					switch e3.t {
+						case TInst(t, params): 
+							// Allow haxe.ds.*Map
+							var mapType = ~/^haxe\.ds\.[A-Z]\w+Map$/;
+							
+							if (!mapType.match(Std.string(t)))
+								typedAssignmentError(e);
+								
+						case _:							
+							typedAssignmentError(e);
+					}
+					
 				case TLocal(v):
+					if (safeLocals.exists(v.id)) return;
+					
+					// Very bizarre case, some Map.set are abstracted as
+					// an assignment that must be picked apart.
+					switch e2.expr {
+						case TField( { expr: TLocal(v2), t: t, pos: _ }, fa):
+							// Additional set may create id1, id2, ...
+							if (v.name.startsWith("id") && fa.equals(FDynamic("__id__"))) {
+								// Confirmed a Map.set statement, so set its var as safe,
+								// in case it appears in a later statement.
+								safeLocals.set(v.id, true);
+								return;
+							}
+						case _: 							
+					}
+					
 					if (!v.name.startsWith("__mutable_")) {
-						if (!Reflect.hasField(v, "meta")) typedAssignmentError(e);
+						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e);
 
 						// The compiler can generate assignments, trust them for now.
 						#if (haxe_ver < 3.3)

@@ -50,6 +50,14 @@ class RunTests extends buddy.SingleSuite
 				var local = new LocalImmutable().test();
 				local.mutable.should.be("ok");
 			});
+			
+			it("should handle @mutable on function arguments", {
+				new MutableArguments().test("hello", "immutable").should.be("HELLO");
+			});
+			
+			it("should allow map.set calls on generic maps.", {
+				(function() new MapSet().test()).should.not.throwAnything();
+			});
 		});
 	}
 }
@@ -205,7 +213,47 @@ class LocalImmutable implements ImmutableLocalVars
 @:analyzer(local_dce)
 class OptimizedImmutable implements Immutable
 {
-	public function new() {
+	public function new() {}
+}
+
+class MutableArguments implements Immutable
+{
+	public function new() { }
+
+	public function test(@mutable a : String, b : String) {
+		function modify(@mutable b : String) {
+			b = b.toUpperCase();
+			return b;
+		}
+		//TEST: b = a;
+		a = modify(a);
+		return a;
+	}
+}
+
+// Maps are abstracted, special care must be taken to allow their assignments.
+class MapSet implements Immutable
+{
+	var map = new Map<String, String>();
+	
+	public function new() { }
+	
+	public function test() {
+		var localmap = new Map<Int, String>();
+		var fullmap = new Map<MutableArguments, MapSet>();
 		
+		map.set("a", "a");
+		map.get("a");
+		map.remove("a");
+		
+		localmap.set(1, "1");
+		localmap.get(1);
+		localmap.remove(1);
+		
+		var m = new MutableArguments();
+		fullmap.set(m, new MapSet());
+		fullmap.set(new MutableArguments(), new MapSet());
+		fullmap.get(m);
+		fullmap.remove(m);
 	}
 }

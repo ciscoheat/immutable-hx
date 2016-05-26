@@ -21,7 +21,11 @@ install:
 
 script:
   - haxelib run travix neko
-  - haxelib run travix node
-  - haxelib run travix cpp
   - haxe -cp tests -main RunFailureTests --interp
-    
+  - haxelib run travix node
+  - haxelib run travix python
+  - haxelib run travix flash
+  - haxelib run travix php 
+  - haxelib run travix cs
+  - haxelib run travix java
+  - haxelib run travix cpp

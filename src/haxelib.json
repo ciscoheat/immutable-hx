@@ -4,8 +4,8 @@
   "description": "Enforce immutability.",
   "license": "MIT",
   "contributors": ["ciscoheat"],
-  "version": "0.8.1",
-  "releasenote": "3.3 fix.",
+  "version": "0.9.0",
+  "releasenote": "Function arguments can now be mutable. Displaying multiple errors at once. Fixed Map.set.",
   "tags": ["cross", "immutable", "fp"],
   "dependencies": {}
 }
