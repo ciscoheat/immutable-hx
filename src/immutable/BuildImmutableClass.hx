@@ -152,13 +152,17 @@ class BuildImmutableClass
 	
 	// NOTE: Also modifies the argument name, if @mutable
 	function mutableFunctionArguments(args : Array<FunctionArg>) : Array<String> {
+		#if (haxe_ver >= 3.3)
 		return [for (arg in args) {
 			if (arg.meta.exists(function(m) return m.name == "mutable")) {
 				var originalName = arg.name;
 				arg.name = '__mutable_' + arg.name;
 				originalName;		
 			}
-		}];		
+		}];
+		#else
+		return [];
+		#end
 	}
 	
 	function renameMutableVars(inConstructor : Bool, mutables : Array<String>, e : Expr) {
