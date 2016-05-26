@@ -73,7 +73,7 @@ class BuildImmutableClass
 							for (field in allClassFields) {
 								if(!builder.onlyLocalVars) switch field.kind {
 									case FVar(_, write):
-										if (write != AccNo && write != AccNever && !builder.mutableFieldNames.has(field.name)) {
+										if (field.isPublic && write != AccNo && write != AccNever && !builder.mutableFieldNames.has(field.name)) {
 											Context.error(
 												"Setters are not allowed in an Immutable class. Use only 'null' or 'never'.", 
 											field.pos);
@@ -132,8 +132,8 @@ class BuildImmutableClass
 			case FVar(t, e):
 				if (e != null) renameMutableVars(false, [], e);
 				
-				// Rewrite var to var(default, null)
-				if(!onlyLocalVars && !mutableFieldNames.has(field.name))
+				// Rewrite public vars to var(default, null)
+				if(field.access.has(APublic) && !onlyLocalVars && !mutableFieldNames.has(field.name))
 					field.kind = FProp('default', 'null', t, e);
 					
 				field;
@@ -211,7 +211,7 @@ class BuildImmutableClass
 	}
 	
 	function typedAssignmentError(e : TypedExpr) {
-		//trace("============ error"); trace(e.expr); trace(e.t);
+		//trace("===== Assignment error ====="); trace(e.expr); trace(e.t);
 		assignmentErrors.push(e.pos);
 	}
 	
@@ -276,10 +276,11 @@ class BuildImmutableClass
 					
 				// Test for generic Map.set, for example StringMap
 				// since it's abstract, the set method is replaced by an assignment.
-				case TArray({ expr: TField(e3, _), t: t, pos:_ }, _):
-					switch e3.t {
-						case TInst(t2, _): failIfNotMap(t2.get());								
-						case _:	typedAssignmentError(e);
+				case TArray( { expr: TField(e3, _), t: t, pos:_ }, _):
+					var type = e3.expr.equals(TConst(TThis)) ? t : e3.t;
+					switch type {
+						case TInst(t2, _): failIfNotMap(t2.get());
+						case _: typedAssignmentError(e);
 					}
 				
 				// Flash stores Maps differently.

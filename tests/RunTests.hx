@@ -19,6 +19,7 @@ class RunTests extends buddy.SingleSuite
 			it("should transform all public class vars to prop(default, null)", {
 				i.test(123).should.be(456);
 				//TEST: i.publicVar = "illegal";
+				//TEST: i.privateVar.should.be("illegal");
 			});
 			
 			it("should not allow any non-var assignments", {
