@@ -275,8 +275,41 @@ class BuildImmutableClass
 					
 				}
 				return;
+
+			case TBinop(OpAssign, e1, _) | TBinop(OpAssignOp(_), e1, _) | TUnop(OpIncrement, _, e1) | TUnop(OpDecrement, _, e1) : switch(e1.expr) {
+
+				case TLocal(v):
+					if (safeLocals.exists(v.id)) return;
+					
+					// Very bizarre case, some Map.set are abstracted as
+					// an assignment that must be picked apart.
+					switch e1.expr {
+						case TField( { expr: TLocal(v2), t: t, pos: _ }, fa):
+							// Additional set may create id1, id2, ...
+							if (v.name.startsWith("id") && fa.equals(FDynamic("__id__"))) {
+								// Confirmed a Map.set statement, so set its var as safe,
+								// in case it appears in a later statement.
+								safeLocals.set(v.id, true);
+								return;
+							}
+						case _: 							
+					}
+					
+					// _g1 is a special for loop comprehension field
+					if (!v.name.startsWith("__hxim__") && v.name != "_g1") {
+						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e);
 			
-			case TBinop(OpAssign, e1, e2) | TBinop(OpAssignOp(_), e1, e2): switch(e1.expr) {
+						// The compiler can generate assignments, trust them for now.
+						#if (haxe_ver < 3.3)
+						var meta : Array<Dynamic> = untyped v.meta;
+						#else
+						// Working properly in 3.3
+						var meta = v.meta.get();
+						#end
+						if (!meta.exists(function(m) return m.name == ":compilerGenerated"))
+							typedAssignmentError(e);
+					}
+
 				case TField({ expr: fieldExpr, t: t, pos: _ }, fa): 
 					var skipClassFieldTests = if(onlyLocalVars) true else switch t {
 						// Skip instance references not pointing to the own class
@@ -339,37 +372,6 @@ class BuildImmutableClass
 						case TInst(t2, _): failIfNotMap(t2.get());
 						case _: typedAssignmentError(e);
 					}					
-					
-				case TLocal(v):
-					if (safeLocals.exists(v.id)) return;
-					
-					// Very bizarre case, some Map.set are abstracted as
-					// an assignment that must be picked apart.
-					switch e2.expr {
-						case TField( { expr: TLocal(v2), t: t, pos: _ }, fa):
-							// Additional set may create id1, id2, ...
-							if (v.name.startsWith("id") && fa.equals(FDynamic("__id__"))) {
-								// Confirmed a Map.set statement, so set its var as safe,
-								// in case it appears in a later statement.
-								safeLocals.set(v.id, true);
-								return;
-							}
-						case _: 							
-					}
-					
-					if (!v.name.startsWith("__hxim__")) {
-						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e);
-
-						// The compiler can generate assignments, trust them for now.
-						#if (haxe_ver < 3.3)
-						var meta : Array<Dynamic> = untyped v.meta;
-						#else
-						// Working properly in 3.3
-						var meta = v.meta.get();
-						#end
-						if (!meta.exists(function(m) return m.name == ":compilerGenerated"))
-							typedAssignmentError(e);
-					}
 					
 				case _: 
 					typedAssignmentError(e);

@@ -371,7 +371,7 @@ class UnaryOpUsage implements Immutable {
 
 	public function test() {
 		var a = 123;
-		//TEST: var b = a++;
+		//TEST: var b = a * (a++);
 		
 		new Date(2016, 5, 7, 0, 0, 0);
 		//TEST: var c = --a;
