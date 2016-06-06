@@ -12,6 +12,11 @@ using haxe.macro.TypedExprTools;
 using Lambda;
 using StringTools;
 
+private enum Mutable {
+	WholeScope;
+	NextExpr;
+}
+
 class BuildImmutableClass
 {
 	static var immutableTypes = new Map<String, BuildImmutableClass>();
@@ -130,7 +135,7 @@ class BuildImmutableClass
 	function makeImmutable(fields : Array<Field>) : Array<Field> {
 		return fields.map(function(field) return switch field.kind {
 			case FVar(t, e):
-				if (e != null) renameMutableVars(false, [], e);
+				if (e != null) renameMutableVars(false, new Map<String, Mutable>(), e);
 				
 				// Rewrite public vars to var(default, null)
 				if(field.access.has(APublic) && !onlyLocalVars && !mutableFieldNames.has(field.name))
@@ -139,12 +144,14 @@ class BuildImmutableClass
 				field;
 			
 			case FProp(get, set, t, e):
-				if (e != null) renameMutableVars(false, [], e);
+				if (e != null) renameMutableVars(false, new Map<String, Mutable>(), e);
 				field;
 				
 			case FFun(f):
 				// Test if some method arguments are marked with mutable
-				var mutables = mutableFunctionArguments(f.args);
+				var mutables = new Map<String, Mutable>();
+				for (arg in mutableFunctionArguments(f.args)) mutables.set(arg, WholeScope);
+				
 				if (f.expr != null) renameMutableVars(field.name == "new", mutables, f.expr);
 				field;
 		});		
@@ -156,7 +163,7 @@ class BuildImmutableClass
 		return [for (arg in args) {
 			if (arg.meta.exists(function(m) return m.name == "mutable")) {
 				var originalName = arg.name;
-				arg.name = '__mutable_' + arg.name;
+				arg.name = mutableVarName(arg.name);
 				originalName;		
 			}
 		}];
@@ -165,39 +172,59 @@ class BuildImmutableClass
 		#end
 	}
 	
-	function renameMutableVars(inConstructor : Bool, mutables : Array<String>, e : Expr) {
+	function mutableVarName(name : String) return '__hxim__' + name;
+	function mutableIfVarName(name : String) return '__hxim_ex_' + name;
+	
+	function cloneMap(mutables : Map<String, Mutable>) {
+		var newMutableScope = new Map<String, Mutable>();
+		for (key in mutables.keys()) newMutableScope.set(key, mutables.get(key));
+		return newMutableScope;
+	}
+	
+	function renameMutableVars(inConstructor : Bool, mutables : Map<String, Mutable>, e : Expr) {
 		switch e.expr {
-			// New block, create a new scope for mutable vars
 			case EBlock(exprs):
-				var newMutableScope = mutables.copy();
+				// New block, create a new scope for mutable vars
+				var newMutableScope = cloneMap(mutables);
 				for (e2 in exprs) renameMutableVars(inConstructor, newMutableScope, e2);
 				return;
 			
-			case EFunction(_, f):
-				if (f.expr != null) renameMutableVars(
-					inConstructor, 
-					mutables.concat(mutableFunctionArguments(f.args)), 
-					f.expr
-				);
+			case EFunction(_, f) if(f.expr != null):
+				var newMutableScope = cloneMap(mutables);
+				for (key in mutableFunctionArguments(f.args)) newMutableScope.set(key, WholeScope);				
+				renameMutableVars(inConstructor, newMutableScope, f.expr);
 				return;
 				
-			// New vars, remove mutables in the current scope if they exist
 			case EVars(vars):
-				for (v in vars) mutables.remove(v.name);
+				// New vars, remove mutables in the current scope if they exist
+				for (v in vars) {
+					mutables.remove(v.name);
+					// Test for complex assignments. The compiler can modify these,
+					// so they need to be tested separately in the typed phase.
+					if (v.expr != null) switch v.expr.expr {
+						case EIf(_, _, _) | ESwitch(_, _, _) | ETry(_, _) | EParenthesis(_):
+							mutables.set(v.name, NextExpr);
+							v.name = mutableIfVarName(v.name);
+						case _:
+					}
+				}
 				
-			case EConst(CIdent(s)) if(mutables.has(s)): 
-				e.expr = EConst(CIdent('__mutable_$s'));
+			case EConst(CIdent(s)):
+				e.expr = switch mutables.get(s) {
+					case WholeScope: EConst(CIdent(mutableVarName(s)));
+					case NextExpr: EConst(CIdent(mutableIfVarName(s)));
+					case _: e.expr;
+				}
 				
 			case EMeta(s, { expr: EVars(vars), pos: _ }) if (s.name == "mutable"):
 				// Run through the vars expressions separately, to avoid them being immutable in the EVars switch.
 				// Run them before setting mutables, because the var expressions aren't in that scope.
 				for (v in vars) renameMutableVars(inConstructor, mutables, v.expr);
 				
-				// Set mutables for the current scope and rename the var so
-				// it can be identified as mutable.
-				for (v in vars) if (!mutables.has(v.name)) {
-					mutables.push(v.name);
-					v.name = '__mutable_${v.name}';
+				// Set mutables for the current scope and rename the var so it can be identified as mutable.
+				for (v in vars) if (!mutables.exists(v.name)) {
+					mutables.set(v.name, WholeScope);
+					v.name = mutableVarName(v.name);
 				}
 				
 				// Need to remove the meta, otherwise it won't compile
@@ -226,6 +253,29 @@ class BuildImmutableClass
 		}
 		
 		switch e.expr {
+			case TBlock(el):
+				var safeLocalInNextExpression = 0;
+				for (texpr in el) {
+					// Test if the expression is a complex assignment (var a = if(...))
+					// then set the var as safe for the next expression, which the compiler may
+					// have rewritten. (if it's an empty var, for example (vexpr == null))
+					switch texpr.expr {
+						case TVar(v, vexpr) if (vexpr == null):
+							safeLocals.set(v.id, true);
+							safeLocalInNextExpression = v.id;
+							
+						case _: 
+							preventAssignments(inConstructor, texpr);
+							
+							if (safeLocalInNextExpression > 0) {
+								safeLocals.remove(safeLocalInNextExpression);
+								safeLocalInNextExpression = 0;
+							}
+					}
+					
+				}
+				return;
+			
 			case TBinop(OpAssign, e1, e2) | TBinop(OpAssignOp(_), e1, e2): switch(e1.expr) {
 				case TField({ expr: fieldExpr, t: t, pos: _ }, fa): 
 					var skipClassFieldTests = if(onlyLocalVars) true else switch t {
@@ -307,7 +357,7 @@ class BuildImmutableClass
 						case _: 							
 					}
 					
-					if (!v.name.startsWith("__mutable_")) {
+					if (!v.name.startsWith("__hxim__")) {
 						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e);
 
 						// The compiler can generate assignments, trust them for now.

@@ -23,8 +23,10 @@ class RunFailureTests {
 			var args = ['tests.hxml', '-cp', 'src', '--interp'];
 			var count = 0;
 
-			for(pos in tests) {
-				Sys.println('Compilation failure test ${++count} of ${tests.length}');
+			for (pos in tests) {
+				var newLine = content.indexOf("\n", pos);
+				Sys.println('Compilation failure test ${++count} of ${tests.length}:');
+				Sys.println(content.substring(pos+8, newLine));
 
 				// Uncomment one test comment at a time
 				File.saveContent(src, content.substr(0, pos) + content.substr(pos+8));

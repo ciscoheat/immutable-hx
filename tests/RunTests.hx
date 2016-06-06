@@ -61,6 +61,14 @@ class RunTests extends buddy.SingleSuite
 			it("should allow map.set calls on generic maps.", {
 				(function() new MapSet().test()).should.not.throwAnything();
 			});
+			
+			it("should handle complex expression assignments", {
+				new ComplexExpressionAssignments(123).test(123);
+			});
+			
+			it("should prevent unary operations", {
+				new UnaryOpUsage().test();
+			});
 		});
 	}
 }
@@ -133,11 +141,14 @@ class VeryImmutable implements Immutable {
 		var test = publicVar;		
 		var number = 0;
 		var number2 = number + 123;
+		var number3 = (number2 + 123);
+		var unassigned;
 		//TEST: mutableVar = 1000;
 		//TEST: number += 123;
 		//TEST: mutableVar = 1000+start; t.eat(mutableVar);
 		//TEST: test = Std.string(start); t.eat(test);
 		//TEST: number += (start + 123); t.eat(number);
+		//TEST: number3 = number2;
 		
 		// ----- Method calls -----
 		var testArray = [];
@@ -281,5 +292,91 @@ class MapSet implements Immutable
 		//TEST: this.map = new Map<String, String>();
 		//TEST: fullClassmap = new Map<OptimizedImmutable, MapSet>();
 		//TEST: mixed = new Map<Int, MapSet>();
+	}
+}
+
+class ComplexExpressionAssignments implements Immutable
+{
+	var assign : Int;
+	
+	public function new(start : Int) {
+		assign = if (start == 123) {
+			new Date(2016,5,4,0,0,0);
+			0;
+		} else {
+			start < 0 ? -1 : 1;
+		}
+	}
+
+	public function test(start : Int) {
+		//TEST: assign = 2;
+		
+		var moreComplex = if (start == 123) {
+			new Date(2016,5,4,0,0,0);
+			0;
+		} else {
+			start < 0 ? -1 : 1;
+		}
+		//TEST: moreComplex = 2;
+
+		var moreComplexParen = (if (start == 123) {
+			new Date(2016,5,4,0,0,0);
+			0;
+		} else {
+			start < 0 ? -1 : 1;
+		});
+		//TEST: moreComplex = 2;
+
+		var comprehension = [for (f in [1, 2, 3]) {
+			new Date(2016, 5, 7, 0, 0, 0);
+			f + 1;
+		}];
+		//TEST: comprehension = [1];
+		
+		var switchTest = switch start {
+			case 1: 0;
+			case 123: 1;
+			case _: throw "error";
+		}
+		//TEST: switchTest = 3;
+
+		var switchCastTest = cast switch start {
+			case 1: 0;
+			case 123: 1;
+			case _: 2;
+		}
+		//TEST: switchCastTest = 3;
+
+		var blockTest = {
+			new Date(2016, 5, 7, 0, 0, 0);
+			start + 1;
+		}
+		//TEST: blockTest = 2;
+		
+		var tryTest = try {
+			new Date(2016, 5, 7, 0, 0, 0);
+			start + 1;
+		} catch (e : Dynamic) {
+			start - 1;
+		}
+		//TEST: tryTest = 2;
+		
+		var boolTest = !if (start > 0) true else false;
+		//TEST: boolTest = false;		
+	}
+}
+
+class UnaryOpUsage implements Immutable {
+	public function new() { }
+
+	public function test() {
+		var a = 123;
+		//TEST: var b = a++;
+		
+		new Date(2016, 5, 7, 0, 0, 0);
+		//TEST: var c = --a;
+		
+		@mutable var d = 123;
+		var e = ++d;
 	}
 }

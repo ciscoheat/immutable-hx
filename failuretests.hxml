@@ -1,0 +1,4 @@
+#-lib buddy
+-cp ./tests/
+-main RunFailureTests
+--interp
