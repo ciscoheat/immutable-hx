@@ -331,6 +331,12 @@ class ComplexExpressionAssignments implements Immutable
 			new Date(2016, 5, 7, 0, 0, 0);
 			f + 1;
 		}];
+		// Two comprehensions, so the compiler generates multiple
+		// prefix increment operations that will be tested.
+		var comprehension = [for (f in [1, 2, 3]) {
+			new Date(2016, 5, 7, 0, 0, 0);
+			f + 1;
+		}];
 		//TEST: comprehension = [1];
 		
 		var switchTest = switch start {

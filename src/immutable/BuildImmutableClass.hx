@@ -295,8 +295,8 @@ class BuildImmutableClass
 						case _: 							
 					}
 					
-					// _g1 is a special for loop comprehension field
-					if (!v.name.startsWith("__hxim__") && v.name != "_g1") {
+					// _gN1 is a special for loop comprehension field
+					if (!v.name.startsWith("__hxim__") && !(v.name.startsWith("_g") && v.name.endsWith("1"))) {
 						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e);
 			
 						// The compiler can generate assignments, trust them for now.
