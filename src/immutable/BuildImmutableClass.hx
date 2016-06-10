@@ -257,6 +257,7 @@ class BuildImmutableClass
 	}
 	
 	var safeLocals = new Map<Int, Bool>();
+	var unassignedLocals = new Map<Int, Bool>();
 	
 	function preventAssignments(inConstructor : Bool, e : TypedExpr) {
 		function failIfNotMap(t : ClassType) {
@@ -269,12 +270,12 @@ class BuildImmutableClass
 		switch e.expr {
 			case TBlock(el):
 				var safeLocalInNextExpression = 0;
-				var checkForVar : String = null;
+				var checkForVarInNextExpr : String = null;
 				
 				function setSafeInNextExpr(v, check : String = null) {
 					safeLocals.set(v.id, true);
 					safeLocalInNextExpression = v.id;
-					checkForVar = check;
+					checkForVarInNextExpr = check;
 				}
 				
 				for (texpr in el) {	
@@ -282,6 +283,11 @@ class BuildImmutableClass
 					// for the next expression, which the compiler may have rewritten.
 					switch texpr.expr {
 						case TVar(v, vexpr):
+							// A normal, empty var, so one assignment is allowed.
+							if (vexpr == null && !v.name.startsWith("__hxim_ex_")) {
+								unassignedLocals.set(v.id, true);
+							}
+							
 							// Neko Map vars, will contain __id__, so check for that
 							if (vexpr == null && v.name.startsWith("id")) {
 								setSafeInNextExpr(v, "__id__");
@@ -311,11 +317,11 @@ class BuildImmutableClass
 					}
 
 					// Test if a variable uses another var, like __id__ for compiler generated expressions.
-					if (checkForVar != null) {
+					if (checkForVarInNextExpr != null) {
 						var hasVar = false;
 						function findVar(t : TypedExpr) {
 							switch t.expr {
-								case TField(_, fa) if (fa.equals(FDynamic(checkForVar))): hasVar = true;
+								case TField(_, fa) if (fa.equals(FDynamic(checkForVarInNextExpr))): hasVar = true;
 								case _: if (!hasVar) t.iter(findVar);
 							}
 						}
@@ -328,15 +334,22 @@ class BuildImmutableClass
 					if (safeLocalInNextExpression > 0) {
 						safeLocals.remove(safeLocalInNextExpression);
 						safeLocalInNextExpression = 0;
-						checkForVar = null;
+						checkForVarInNextExpr = null;
 					}					
 				}
+								
 				return;
 
 			case TBinop(OpAssign, e1, _) | TBinop(OpAssignOp(_), e1, _) | TUnop(OpIncrement, _, e1) | TUnop(OpDecrement, _, e1) : switch(e1.expr) {
 
 				case TLocal(v):
-					if (safeLocals.exists(v.id)) return;
+					if (safeLocals.exists(v.id)) {
+						return;
+					}
+					else if (unassignedLocals.exists(v.id)) {
+						unassignedLocals.remove(v.id);
+						return;
+					}
 					
 					// Very bizarre case, some Map.set are abstracted as
 					// an assignment that must be picked apart.
@@ -411,8 +424,8 @@ class BuildImmutableClass
 									typedAssignmentError(e1);
 							}
 						
-						// Class fields captured by closures.
-						case TLocal(v) if (v.capture == true && ~/^_g\d*this$/.match(v.name)):							
+						// Class fields captured by closures. _g1, _g2this, ...
+						case TLocal(v) if (v.capture == true && ~/^_g\d*(?:this)?$/.match(v.name)):
 						case TLocal(v) if (v.name.startsWith("__hxim__")):
 							
 						case _:							

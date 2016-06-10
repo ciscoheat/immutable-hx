@@ -164,7 +164,10 @@ class VeryImmutable implements Immutable {
 		//TEST: self.publicVar = "illegal";
 		var self2 = function() return this;
 		//TEST: self2().privateVar = "illegal";
-		//TEST: unassigned = 0;
+		
+		// ----- Assigning empty var once -----
+		unassigned = 0;
+		//TEST: unassigned = 1;
 		
 		// ----- Mutable vars -----
 		@mutable var blank : Int;
