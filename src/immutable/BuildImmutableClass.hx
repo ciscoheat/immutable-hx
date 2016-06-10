@@ -28,6 +28,8 @@ class BuildImmutableClass
 	static function build(onlyLocalVars : Bool) {
 		var cls : ClassType = Context.getLocalClass().get();
 		var buildFields = Context.getBuildFields();
+		
+		if (Context.defined("disable-immutable")) return null;
 
 		// Remove some optimizations to avoid mutable vars being modified by the compiler
 		cls.meta.add(":analyzer", [macro no_local_dce], cls.pos);
@@ -267,19 +269,26 @@ class BuildImmutableClass
 		switch e.expr {
 			case TBlock(el):
 				var safeLocalInNextExpression = 0;
-				function setSafeInNextExpr(v) {
+				var checkForVar : String = null;
+				
+				function setSafeInNextExpr(v, check : String = null) {
 					safeLocals.set(v.id, true);
 					safeLocalInNextExpression = v.id;
+					checkForVar = check;
 				}
 				
-				for (texpr in el) {
-					// Test if the expression is a complex assignment (var a = if(...)) or generated,
-					// then set the var as safe for the next expression, which the compiler may
-					// have rewritten.
+				for (texpr in el) {	
+					// Test if the expression is a complex assignment, then set the var as safe 
+					// for the next expression, which the compiler may have rewritten.
 					switch texpr.expr {
-						case TVar(v, vexpr):							
-							// Empty vars "var a;" are allowed, since it is a generated iterator.
-							if (vexpr == null && v.name.startsWith("__hxim_ex_")) {
+						case TVar(v, vexpr):
+							// Neko Map vars, will contain __id__, so check for that
+							if (vexpr == null && v.name.startsWith("id")) {
+								setSafeInNextExpr(v, "__id__");
+								continue;
+							}
+							// Complex assignment vars (var a == if(...))
+							else if (v.name.startsWith("__hxim_ex_")) {
 								setSafeInNextExpr(v);
 								continue;
 							}
@@ -292,21 +301,35 @@ class BuildImmutableClass
 							else if (~/^_g\d*$/.match(v.name) && vexpr.expr.equals(TConst(TInt(0)))) {
 								setSafeInNextExpr(v);
 								continue;
-							} else {
+							} 
+							else {
 								//trace(v.name);
 								//trace(vexpr);
-							}							
+							}
 							
 						case _: 
 					}
-					
+
+					// Test if a variable uses another var, like __id__ for compiler generated expressions.
+					if (checkForVar != null) {
+						var hasVar = false;
+						function findVar(t : TypedExpr) {
+							switch t.expr {
+								case TField(_, fa) if (fa.equals(FDynamic(checkForVar))): hasVar = true;
+								case _: if (!hasVar) t.iter(findVar);
+							}
+						}
+						findVar(texpr);
+						if (!hasVar) typedAssignmentError(texpr);
+					}
+
 					preventAssignments(inConstructor, texpr);
-					
+						
 					if (safeLocalInNextExpression > 0) {
 						safeLocals.remove(safeLocalInNextExpression);
 						safeLocalInNextExpression = 0;
-					}
-					
+						checkForVar = null;
+					}					
 				}
 				return;
 
