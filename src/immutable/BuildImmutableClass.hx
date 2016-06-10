@@ -1,4 +1,6 @@
 package immutable;
+import haxe.PosInfos;
+import haxe.macro.Format;
 
 #if macro
 import haxe.macro.Expr;
@@ -21,21 +23,23 @@ class BuildImmutableClass
 {
 	static var immutableTypes = new Map<String, BuildImmutableClass>();
 	static var typesChecked = false;
+	static var globalAssignmentErrors = new Array<{error: String, pos: Position}>();
 	
 	static function build(onlyLocalVars : Bool) {
 		var cls : ClassType = Context.getLocalClass().get();
 		var buildFields = Context.getBuildFields();
-		
+
 		// Remove some optimizations to avoid mutable vars being modified by the compiler
 		cls.meta.add(":analyzer", [macro no_local_dce], cls.pos);
 		
 		var fieldNames = [for (field in buildFields) field.name];
-		var mutableFieldNames = [for (field in buildFields) 
+		var mutableFieldNames = [];
+		for (field in buildFields) {
 			if (field.meta.find(function(m) return m.name == "mutable") != null) {
 				Context.warning('Field ${field.name} marked as mutable in immutable class', field.pos);
-				field.name;
+				mutableFieldNames.push(field.name);
 			}
-		];
+		}
 		
 		var className = cls.pack.toDotPath(cls.name);
 		var builder = new BuildImmutableClass(className, fieldNames, mutableFieldNames, onlyLocalVars);
@@ -47,8 +51,6 @@ class BuildImmutableClass
 				if (typesChecked) return;
 				typesChecked = true;
 				
-				var assignmentErrors = [];
-
 				for (type in types) switch type {
 					case TInst(t, _):
 						var inst = t.get();
@@ -79,14 +81,16 @@ class BuildImmutableClass
 								if(!builder.onlyLocalVars) switch field.kind {
 									case FVar(_, write):
 										if (field.isPublic && write != AccNo && write != AccNever && !builder.mutableFieldNames.has(field.name)) {
-											Context.error(
-												"Setters are not allowed in an Immutable class. Use only 'null' or 'never'.", 
-											field.pos);
+											globalAssignmentErrors.push({
+												error: "Setters are not allowed in an Immutable class. Use only 'null' or 'never'.", 
+												pos: field.pos
+											});
 										}
 									case FMethod(k):
-										if (k == MethDynamic) Context.error(
-											"Dynamic methods aren't allowed in an Immutable class.", 
-										field.pos);
+										if (k == MethDynamic) globalAssignmentErrors.push({
+											error: "Dynamic methods aren't allowed in an Immutable class.", 
+											pos: field.pos
+										});
 								}
 								
 								if (field.expr() != null) {									
@@ -94,20 +98,22 @@ class BuildImmutableClass
 								}
 							}
 							
-							for (p in builder.assignmentErrors) assignmentErrors.push(p);							
+							for (p in builder.assignmentErrors) globalAssignmentErrors.push({
+								error: "Cannot make assignments in an immutable class without marking the var with @mutable.",
+								pos: p
+							});
 						}
 					case _:
 				}
 				
-				if (assignmentErrors.length > 0) {
-					var errorMessage = "Cannot make assignments in an immutable class without marking the var with @mutable.";
+				if (globalAssignmentErrors.length > 0) {
+					globalAssignmentErrors.sort(function(a, b) return Std.string(a) < Std.string(b) ? 1 : -1);
 					
-					assignmentErrors.sort(function(a, b) return Std.string(a) < Std.string(b) ? 1 : -1);
-					
-					for (pos in assignmentErrors.slice(0, -1))
-						Context.warning(errorMessage, pos);
+					for (error in globalAssignmentErrors.slice(0, -1))
+						Context.warning(error.error, error.pos);
 						
-					Context.error(errorMessage, assignmentErrors[assignmentErrors.length-1]);
+					var lastError = globalAssignmentErrors[globalAssignmentErrors.length - 1];						
+					Context.error(lastError.error, lastError.pos);
 				}				
 			});
 		}
@@ -209,6 +215,12 @@ class BuildImmutableClass
 					}
 				}
 				
+			case EConst(CString(s)) if (e.toString().startsWith("'")):
+				// Rename vars in interpolated strings
+				e.expr = Format.format(e).expr;
+				renameMutableVars(inConstructor, mutables, e);
+				return;
+				
 			case EConst(CIdent(s)):
 				e.expr = switch mutables.get(s) {
 					case WholeScope: EConst(CIdent(mutableVarName(s)));
@@ -219,7 +231,7 @@ class BuildImmutableClass
 			case EMeta(s, { expr: EVars(vars), pos: _ }) if (s.name == "mutable"):
 				// Run through the vars expressions separately, to avoid them being immutable in the EVars switch.
 				// Run them before setting mutables, because the var expressions aren't in that scope.
-				for (v in vars) renameMutableVars(inConstructor, mutables, v.expr);
+				for (v in vars) if(v.expr != null) renameMutableVars(inConstructor, mutables, v.expr);
 				
 				// Set mutables for the current scope and rename the var so it can be identified as mutable.
 				for (v in vars) if (!mutables.exists(v.name)) {
@@ -237,8 +249,8 @@ class BuildImmutableClass
 		e.iter(renameMutableVars.bind(inConstructor, mutables));
 	}
 	
-	function typedAssignmentError(e : TypedExpr) {
-		//trace("===== Assignment error ====="); trace(e.expr); trace(e.t);
+	function typedAssignmentError(e : TypedExpr, ?pos : PosInfos) {
+		trace("===== Assignment error ====="); trace(pos); trace(e.expr); trace(e.t);
 		assignmentErrors.push(e.pos);
 	}
 	
@@ -255,22 +267,44 @@ class BuildImmutableClass
 		switch e.expr {
 			case TBlock(el):
 				var safeLocalInNextExpression = 0;
+				function setSafeInNextExpr(v) {
+					safeLocals.set(v.id, true);
+					safeLocalInNextExpression = v.id;
+				}
+				
 				for (texpr in el) {
-					// Test if the expression is a complex assignment (var a = if(...))
+					// Test if the expression is a complex assignment (var a = if(...)) or generated,
 					// then set the var as safe for the next expression, which the compiler may
-					// have rewritten. (if it's an empty var, for example (vexpr == null))
+					// have rewritten.
 					switch texpr.expr {
-						case TVar(v, vexpr) if (vexpr == null):
-							safeLocals.set(v.id, true);
-							safeLocalInNextExpression = v.id;
+						case TVar(v, vexpr):							
+							// Empty vars "var a;" are allowed, since it is a generated iterator.
+							if (vexpr == null && v.name.startsWith("__hxim_ex_")) {
+								setSafeInNextExpr(v);
+								continue;
+							}
+							// Iterator for haxe.xml.Fast
+							else if (~/^_g\d*_head\d*$/.match(v.name)) {
+								setSafeInNextExpr(v);
+								continue;
+							}
+							// _g\d* is a For -> While loop iterator
+							else if (~/^_g\d*$/.match(v.name) && vexpr.expr.equals(TConst(TInt(0)))) {
+								setSafeInNextExpr(v);
+								continue;
+							} else {
+								//trace(v.name);
+								//trace(vexpr);
+							}							
 							
 						case _: 
-							preventAssignments(inConstructor, texpr);
-							
-							if (safeLocalInNextExpression > 0) {
-								safeLocals.remove(safeLocalInNextExpression);
-								safeLocalInNextExpression = 0;
-							}
+					}
+					
+					preventAssignments(inConstructor, texpr);
+					
+					if (safeLocalInNextExpression > 0) {
+						safeLocals.remove(safeLocalInNextExpression);
+						safeLocalInNextExpression = 0;
 					}
 					
 				}
@@ -296,8 +330,8 @@ class BuildImmutableClass
 					}
 					
 					// _g\d+ is a special for loop comprehension field
-					if (!v.name.startsWith("__hxim__") && !~/^_g\d+$/.match(v.name)) {
-						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e);
+					if (!v.name.startsWith("__hxim__") && !~/^_g\d*$/.match(v.name)) {
+						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e1);
 			
 						// The compiler can generate assignments, trust them for now.
 						#if (haxe_ver < 3.3)
@@ -307,7 +341,7 @@ class BuildImmutableClass
 						var meta = v.meta.get();
 						#end
 						if (!meta.exists(function(m) return m.name == ":compilerGenerated"))
-							typedAssignmentError(e);
+							typedAssignmentError(e1);
 					}
 
 				case TField({ expr: fieldExpr, t: t, pos: _ }, fa): 
@@ -338,10 +372,10 @@ class BuildImmutableClass
 								case FInstance(_, _, cf):
 									var field = cf.get().name;
 									if (!mutableFieldNames.has(field) && !(inConstructor && fieldNames.has(field)))
-										typedAssignmentError(e);
+										typedAssignmentError(e1);
 									
 								case _: 
-									typedAssignmentError(e);
+									typedAssignmentError(e1);
 							}
 							
 						// Testing static field assignments
@@ -349,12 +383,17 @@ class BuildImmutableClass
 							switch fa {
 								case FStatic(_, cf):
 									var field = cf.get().name;
-									if (!mutableFieldNames.has(field)) typedAssignmentError(e);
+									if (!mutableFieldNames.has(field)) typedAssignmentError(e1);
 								case _:
-									typedAssignmentError(e);
+									typedAssignmentError(e1);
 							}
-						case _:
-							typedAssignmentError(e);
+						
+						// Class fields captured by closures.
+						case TLocal(v) if (v.capture == true && ~/^_g\d*this$/.match(v.name)):							
+						case TLocal(v) if (v.name.startsWith("__hxim__")):
+							
+						case _:							
+							typedAssignmentError(e1);
 					}
 					
 				// Test for generic Map.set, for example StringMap
@@ -363,18 +402,18 @@ class BuildImmutableClass
 					var type = e3.expr.equals(TConst(TThis)) ? t : e3.t;
 					switch type {
 						case TInst(t2, _): failIfNotMap(t2.get());
-						case _: typedAssignmentError(e);
+						case _: typedAssignmentError(e1);
 					}
 				
-				// Flash stores Maps differently.
-				case TArray({ expr: TLocal(_), t: t, pos: _ }, _):
-					switch t {
+				// Map and Reflect operations on some targets
+				case TArray( { expr: TLocal(v), t: t, pos: _ }, _):
+					if (!v.name.startsWith("__hxim__")) switch t {
 						case TInst(t2, _): failIfNotMap(t2.get());
-						case _: typedAssignmentError(e);
-					}					
+						case _: typedAssignmentError(e1);
+					}
 					
 				case _: 
-					typedAssignmentError(e);
+					typedAssignmentError(e1);
 			}				
 			case _: 
 		}

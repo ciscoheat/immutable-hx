@@ -154,7 +154,6 @@ class VeryImmutable implements Immutable {
 		var testArray = [];
 		testArray.push(1);
 		//TEST: testArray = []; t.eat(testArray);
-		
 		// ----- Calling other objects -----
 		var mutable = new Mutable();
 		mutable.publicVar = 1;
@@ -165,10 +164,13 @@ class VeryImmutable implements Immutable {
 		//TEST: self.publicVar = "illegal";
 		var self2 = function() return this;
 		//TEST: self2().privateVar = "illegal";
+		//TEST: unassigned = 0;
 		
-		// ----- Mutable var -----
+		// ----- Mutable vars -----
+		@mutable var blank : Int;
 		@mutable var exception = start;
 		exception = exception + 77;
+		blank = start;
 		
 		if (true) {
 			// In different scope
@@ -189,6 +191,9 @@ class VeryImmutable implements Immutable {
 		// ----- Macro rewrites -----
 		Macro.assign(exception, exception + 56);
 		//TEST: Macro.assign(number, 555-start); t.eat(number);
+		
+		// ----- String interpolation -----
+		var str = 'Test: $exception';
 		
 		return exception;
 	}
@@ -298,6 +303,7 @@ class MapSet implements Immutable
 class ComplexExpressionAssignments implements Immutable
 {
 	var assign : Int;
+	@mutable var assign2 : Int;
 	
 	public function new(start : Int) {
 		assign = if (start == 123) {
@@ -368,7 +374,11 @@ class ComplexExpressionAssignments implements Immutable
 		//TEST: tryTest = 2;
 		
 		var boolTest = !if (start > 0) true else false;
-		//TEST: boolTest = false;		
+		//TEST: boolTest = false;
+		
+		// Field var captured by closure
+		var a = function() assign2 = 2;
+		a();
 	}
 }
 
