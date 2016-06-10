@@ -252,7 +252,7 @@ class BuildImmutableClass
 	}
 	
 	function typedAssignmentError(e : TypedExpr, ?pos : PosInfos) {
-		trace("===== Assignment error ====="); trace(pos); trace(e.expr); trace(e.t);
+		//trace("===== Assignment error ====="); trace(pos); trace(e.expr); trace(e.t);
 		assignmentErrors.push(e.pos);
 	}
 	

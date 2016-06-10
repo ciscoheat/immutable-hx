@@ -31,7 +31,7 @@ class YourClass implements Immutable
 }
 ```
 
-It's using macros for enforcing this at compile-time, so it won't slow down your code.
+The library is using macros for enforcing this at compile-time only, so it won't slow down your code. It may affect compilation time a bit, so in certain cases you may choose to disable all checking with `-D disable-immutable`.
 
 ## ES6-style
 
@@ -44,7 +44,7 @@ let b = 234;   | @mutable var b = 234;
 
 ## For local vars only
 
-If you want your class vars and properties to behave as usual, you can implement `ImmutableLocalVars` instead, and it will only affect vars in methods. This can be useful if you have another library that rewrites the class fields, like [DataClass](https://github.com/ciscoheat/dataclass).
+If you want your class vars and properties to behave as usual, you can implement `ImmutableLocalVars` instead, and it will only affect vars in methods.
 
 ## Problems?
 
