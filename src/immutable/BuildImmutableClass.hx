@@ -210,9 +210,17 @@ class BuildImmutableClass
 					// Test for complex assignments. The compiler can modify these,
 					// so they need to be tested separately in the typed phase.
 					if (v.expr != null) switch v.expr.expr {
-						case EIf(_, _, _) | ESwitch(_, _, _) | ETry(_, _) | EParenthesis(_):
+						case EIf(_, _, _) | ESwitch(_, _, _) | ETry(_, _): // | EParenthesis(_):
 							mutables.set(v.name, NextExpr);
 							v.name = mutableIfVarName(v.name);
+						// Check one level of parenthesis only.
+						case EParenthesis(e): switch e.expr {
+							case EIf(_, _, _) | ESwitch(_, _, _) | ETry(_, _):
+								mutables.set(v.name, NextExpr);
+								v.name = mutableIfVarName(v.name);
+							case _:
+						}
+							
 						case _:
 					}
 				}
@@ -291,27 +299,24 @@ class BuildImmutableClass
 							// Neko Map vars, will contain __id__, so check for that
 							if (vexpr == null && v.name.startsWith("id")) {
 								setSafeInNextExpr(v, "__id__");
-								continue;
 							}
 							// Complex assignment vars (var a == if(...))
 							else if (v.name.startsWith("__hxim_ex_")) {
 								setSafeInNextExpr(v);
-								continue;
 							}
 							// Iterator for haxe.xml.Fast
 							else if (~/^_g\d*_head\d*$/.match(v.name)) {
 								setSafeInNextExpr(v);
-								continue;
 							}
 							// _g\d* is a For -> While loop iterator
 							else if (~/^_g\d*$/.match(v.name) && vexpr.expr.equals(TConst(TInt(0)))) {
 								setSafeInNextExpr(v);
-								continue;
 							} 
 							else {
-								//trace(v.name);
-								//trace(vexpr);
-							}
+								//trace(v.name); trace(vexpr);
+								preventAssignments(inConstructor, texpr);
+							}							
+							continue;
 							
 						case _: 
 					}
@@ -331,6 +336,7 @@ class BuildImmutableClass
 
 					preventAssignments(inConstructor, texpr);
 						
+					// If current expression is a non-var expression, clear "checkForVar".
 					if (safeLocalInNextExpression > 0) {
 						safeLocals.remove(safeLocalInNextExpression);
 						safeLocalInNextExpression = 0;

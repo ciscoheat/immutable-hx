@@ -4,8 +4,8 @@
   "description": "Enforce immutability.",
   "license": "MIT",
   "contributors": ["ciscoheat"],
-  "version": "0.10.2",
-  "releasenote": "Bugfixes, handles compiler generated code better.",
+  "version": "0.10.3",
+  "releasenote": "Map assignment and parenthesis fix.",
   "tags": ["cross", "immutable", "fp"],
   "dependencies": {}
 }
