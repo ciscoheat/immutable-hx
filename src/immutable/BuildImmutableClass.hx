@@ -357,22 +357,8 @@ class BuildImmutableClass
 						return;
 					}
 					
-					// Very bizarre case, some Map.set are abstracted as
-					// an assignment that must be picked apart.
-					switch e1.expr {
-						case TField( { expr: TLocal(v2), t: t, pos: _ }, fa):
-							// Additional set may create id1, id2, ...
-							if (v.name.startsWith("id") && fa.equals(FDynamic("__id__"))) {
-								// Confirmed a Map.set statement, so set its var as safe,
-								// in case it appears in a later statement.
-								safeLocals.set(v.id, true);
-								return;
-							}
-						case _: 							
-					}
-					
 					// _g\d+ is a special for loop comprehension field
-					if (!v.name.startsWith("__hxim__") && !~/^_g\d*$/.match(v.name)) {
+					if (!v.name.startsWith("__hxim__")) {
 						if (!Reflect.hasField(v, "meta")) return typedAssignmentError(e1);
 			
 						// The compiler can generate assignments, trust them for now.
