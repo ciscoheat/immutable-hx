@@ -438,21 +438,7 @@ class BuildImmutableClass
 							typedAssignmentError(e1);
 					}
 					
-				// Test for generic Map.set, for example StringMap
-				// since it's abstract, the set method is replaced by an assignment.
-				case TArray( { expr: TField(e3, _), t: t, pos:_ }, _):
-					var type = e3.expr.equals(TConst(TThis)) ? t : e3.t;
-					switch type {
-						case TInst(t2, _): failIfNotMap(t2.get());
-						case _: typedAssignmentError(e1);
-					}
-				
-				// Map and Reflect operations on some targets
-				case TArray( { expr: TLocal(v), t: t, pos: _ }, _):
-					if (!v.name.startsWith("__hxim__")) switch t {
-						case TInst(t2, _): failIfNotMap(t2.get());
-						case _: typedAssignmentError(e1);
-					}
+				case TArray(_, _):
 					
 				case _: 
 					typedAssignmentError(e1);

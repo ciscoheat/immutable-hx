@@ -69,6 +69,10 @@ class RunTests extends buddy.SingleSuite
 			it("should prevent unary operations", {
 				new UnaryOpUsage().test();
 			});
+			
+			it("should allow array assignment", {
+				new ArrayUsage().test([1,2,3,4,5]).should.be(123);
+			});
 		});
 	}
 }
@@ -397,5 +401,15 @@ class UnaryOpUsage implements Immutable {
 		
 		@mutable var d = 123;
 		var e = ++d;
+	}
+}
+
+class ArrayUsage implements Immutable {
+	public function new() { }
+	
+	public function test(a : Array<Int>) {
+		a[1] = 123;
+		//TEST: a = [1, 2, 3];
+		return a[1];
 	}
 }
