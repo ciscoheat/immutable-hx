@@ -35,6 +35,13 @@ class BuildImmutableClass
 		cls.meta.add(":analyzer", [macro no_local_dce], cls.pos);
 		
 		var fieldNames = [for (field in buildFields) field.name];
+		
+		var superClass = cls.superClass;
+		while (superClass != null) {
+			fieldNames = fieldNames.concat(superClass.t.get().fields.get().map(function(f) return f.name));
+			superClass = superClass.t.get().superClass;
+		}
+		
 		var mutableFieldNames = [];
 		for (field in buildFields) {
 			if (field.meta.find(function(m) return m.name == "mutable") != null) {
@@ -260,7 +267,7 @@ class BuildImmutableClass
 	}
 	
 	function typedAssignmentError(e : TypedExpr, ?pos : PosInfos) {
-		//trace("===== Assignment error ====="); trace(pos); trace(e.expr); trace(e.t);
+		//trace("===== Assignment error ====="); trace(pos); trace(e.expr); trace(e.t); trace(TypedExprTools.toString(e, true));
 		assignmentErrors.push(e.pos);
 	}
 	

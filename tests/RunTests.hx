@@ -70,7 +70,7 @@ class RunTests extends buddy.SingleSuite
 				new UnaryOpUsage().test();
 			});
 			
-			it("should allow array assignment", {
+			it("should allow array assignment and allow superclass assignments in constructor", {
 				new ArrayUsage().test([1,2,3,4,5]).should.be(123);
 			});
 		});
@@ -404,12 +404,19 @@ class UnaryOpUsage implements Immutable {
 	}
 }
 
-class ArrayUsage implements Immutable {
-	public function new() { }
+class SuperClassTest {
+	public var parent : Int;
+}
+
+class ArrayUsage extends SuperClassTest implements Immutable {
+	public function new() {
+		parent = 1;
+	}
 	
 	public function test(a : Array<Int>) {
 		a[1] = 123;
 		//TEST: a = [1, 2, 3];
+		//TEST: parent = 2;
 		return a[1];
 	}
 }
