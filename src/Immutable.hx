@@ -1,2 +1,2 @@
 
-@:autoBuild(immutable.BuildImmutableClass.build(false)) interface Immutable {}
+@:autoBuild(immutable.BuildImmutableClass.build()) interface Immutable {}

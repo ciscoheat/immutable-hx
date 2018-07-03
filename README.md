@@ -1,6 +1,6 @@
 # Immutable
 
-Make your classes and local vars immutable with
+A Haxe 4 library for making your local vars immutable with
 
 `haxelib install immutable` 
 
@@ -9,13 +9,11 @@ Make your classes and local vars immutable with
 ```haxe
 class YourClass implements Immutable
 {
-	public var test : String;
-
-	// Fields can be mutable, but will emit a compiler warning:
-	@mutable public var specialCase : String;
+	// For immutable class fields, use the Haxe 4 "final" keyword.
+	public final test : String;
 
 	public function new() {
-		test = "It's ok to assign in the constructor";
+		test = "Final";
 	}
 
 	public function test() {
@@ -24,14 +22,16 @@ class YourClass implements Immutable
 
 		@mutable var b = 123;
 		b = 234; // Ok
+	}
 
-		this.test = "mutated!"; // *** Compilation error, incl. external access
-		this.specialCase = "special"; // Ok
+	public function test2(a : String, @mutable b : Int) {
+		a = "changed"; // *** Compilation error
+		b = 123; // Ok
 	}
 }
 ```
 
-The library is using macros for enforcing this at compile-time only, so it won't slow down your code. It may affect compilation time a bit, so in certain cases you may choose to disable all checking with `-D disable-immutable`.
+Since the library is enforcing this at compile-time, it won't slow down your code. It may affect compilation time a little, so in certain cases you may choose to disable all checking with `-D disable-immutable`.
 
 ## ES6-style
 
@@ -42,9 +42,9 @@ ES6            | Haxe
 const a = 123; | var a = 123;
 let b = 234;   | @mutable var b = 234;
 
-## For local vars only
+## Limitations
 
-If you want your class vars and properties to behave as usual, you can implement `ImmutableLocalVars` instead, and it will only affect vars in methods.
+If the compiler cannot find any type information, it cannot make the var immutable.
 
 ## Problems?
 

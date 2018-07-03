@@ -8,23 +8,16 @@ os:
   - osx
   
 haxe:
-  - "3.2.1"
   - development
   
-matrix:
-  allow_failures:
-    - haxe: development
-    
 install:
   - haxelib install travix
   - haxelib run travix install
 
 script:
   - haxelib run travix neko
-  - haxe -cp tests -main RunFailureTests --interp
+  - haxelib run travix interp
   - haxelib run travix node
-  - haxelib run travix python
-  - haxelib run travix flash -D flash-exit -D reporter=buddy.reporting.TraceReporter
   - haxelib run travix php 
   - haxelib run travix cs
   - haxelib run travix java

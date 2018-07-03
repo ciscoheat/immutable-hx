@@ -1,6 +1,0 @@
--lib buddy
--cp src 
--cp tests
--debug
--main RunTests
--neko bin/immutable.n

@@ -1,3 +1,5 @@
 -lib buddy
--cp ./tests/
+-cp tests
+-cp src
+-dce full
 -main RunTests
