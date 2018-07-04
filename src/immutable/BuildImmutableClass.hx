@@ -15,6 +15,8 @@ using StringTools;
 class BuildImmutableClass
 {
 	static function build() {
+		if(Context.defined("display")) return null;
+		
 		var ver = Std.parseFloat(Context.getDefines().get('haxe_ver'));
 		if(ver < 4) Context.error("Immutable requires Haxe 4.", Context.currentPos());
 

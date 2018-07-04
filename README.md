@@ -49,15 +49,15 @@ let b = 234;   | @mutable var b = 234;
 If the compiler cannot find any type information, it cannot make the var immutable and will fail compilation. This can unfortunately be the case for even very simple assignments, like:
 
 ```haxe
-var a = [1,2,3,4,5,6,7];
-var b = a.concat([8]); // Can't know what type a is, at this stage.
+var a = [1,2,3,4];
+var b = a.concat([5]); // Compiler doesn't recognize a here.
 ```
 
 The way to fix it is to provide the type yourself:
 
 ```haxe
-var a = [1,2,3,4,5,6,7];
-var b : Array<Int> = a.concat([8]);
+var a = [1,2,3,4];
+var b : Array<Int> = a.concat([5]);
 ```
 
 ### Short lambdas
