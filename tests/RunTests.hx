@@ -18,7 +18,9 @@ class RunTests extends buddy.SingleSuite
 				i.testMultipleVars().should.be("123");
 				i.testFunctions().should.be("testtest");
 				i.testComplexType().should.be("txt");
-				i.testFunctionWithTypeInformation().should.be("1test5");
+				i.testFunctionVars().should.be("1test5");
+				i.testClosureVars().should.be("testclosure");
+				i.testMutableClosureVars().should.be("mutabletestclosure");
 			});
 
 			it("should be able to make vars mutable with @mutable metadata", {
@@ -95,12 +97,29 @@ class LocalImmutable implements Immutable
 		return b("test");
 	}
 
-	public function testFunctionWithTypeInformation() {
+	public function testFunctionVars() {
 		var a = 1;
 		var b = function (a : String) {
 			return a + a.length;
 		}
 		return b(a + "test");
+	}
+
+	public function testClosureVars() {
+		var a = "test";
+		function b(c : String) {
+			return a + c;
+		}
+		return b("closure");
+	}
+
+	public function testMutableClosureVars() {
+		@mutable var a = "test";
+		function b(c : String) {
+			a = "mutabletest";
+			return a + c;
+		}
+		return b("closure");
 	}
 
 	public function testComplexType() {
@@ -128,27 +147,3 @@ class LocalImmutable implements Immutable
 		return b(a + "test");
 	}
 }
-
-// Should emit a warning:
-@:analyzer(local_dce)
-class OptimizedImmutable implements Immutable
-{
-	public function new() {}
-}
-
-/*
-class MutableArguments implements Immutable
-{
-	public function new() { }
-
-	public function test(@mutable a : String, b : String) {
-		function modify(@mutable b : String) {
-			b = b.toUpperCase();
-			return b;
-		}
-		//xTEST: b = a; // Cannot use this test because of the #if
-		a = modify(a);
-		return a;
-	}
-}
-*/

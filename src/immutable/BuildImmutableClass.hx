@@ -30,26 +30,36 @@ class BuildImmutableClass
 
 		for(field in buildFields) switch field.kind {
 			case FFun(f) if(f.expr != null):
-				iterateFunction(f);
+				iterateFunction(new Map<String, Bool>(), f);
 			case _:
 		}
 
 		return buildFields;
 	}
 
-	static function iterateFunction(f : Function) {
-		var immutableArgs = [for(arg in f.args)
-			if(arg.meta == null || !arg.meta.exists(a -> a.name == "mutable"))
-				arg.name => true
+	static function iterateFunction(currentImmutableVars : Map<String, Bool>, f : Function) {
+		// Make a copy of current immutable vars
+		var immutableArgs = [for(key in currentImmutableVars.keys())
+			key => true
 		];
-
-		var mutableArgs = [for(arg in f.args)
-			if(arg.meta != null && arg.meta.exists(a -> a.name == "mutable"))
-				arg.name => true
-		];
+		var mutableArgs = new Map<String, Bool>(); 
+		var hasImmutableArgs = false;
+		
+		for(arg in f.args) {
+			if(arg.meta == null || !arg.meta.exists(a -> a.name == "mutable")) {
+				// If arg is immutable, add it to the map
+				immutableArgs.set(arg.name, true);
+				hasImmutableArgs = true;
+			} else {
+				// If arg is mutable, remove it from the copy of the
+				// current var lists, in case it exists in the outer scope.
+				mutableArgs.set(arg.name, true);
+				immutableArgs.remove(arg.name);
+			}
+		}
 
 		replaceVarsWithFinalStructs(immutableArgs, f.expr);
-		injectImmutableVarNames(mutableArgs, f);
+		if(hasImmutableArgs) injectImmutableVarNames(mutableArgs, f);
 	}
 
 	static function injectImmutableVarNames(mutables : Map<String, Bool>, f : Function) {
@@ -74,11 +84,6 @@ class BuildImmutableClass
 			}
 		}]);
 
-		switch newVars {
-			case EVars(vars): if(vars.length == 0) return;
-			case _: Context.error("Invalid newVars.", Context.currentPos());
-		}
-
 		//trace("Immutable vars:"); trace(newVars); trace("-----------------");
 
 		var varExpr = { expr: newVars, pos: f.expr.pos };
@@ -94,62 +99,63 @@ class BuildImmutableClass
 		}
 	}
 
-	static function replaceVarsWithFinalStructs(varMap : Map<String, Bool>, e : Expr) {
-		switch e.expr {
-			case EVars(vars):
-				for(v in vars) {
-					if(v.expr == null) Context.error(
-						'var ${v.name} is immutable and must be assigned immediately.', e.pos
-					)
-					else {
-						replaceVarsWithFinalStructs(varMap, v.expr);
-					}
-
-					var name = v.name;
-
-					var type = try if(v.type != null) v.type else Context.toComplexType(Context.typeof(v.expr))
-					catch(e : Dynamic) Context.error(
-						'No type information found, cannot make var $name immutable.', 
-						v.expr.pos
-					);
-
-					// var a : T = V    
-					// Becomes
-					// var a : { final a: T; } = {a: V};
-
-					v.type = TAnonymous([{
-						access: [AFinal],
-						doc: null,
-						kind: FVar(type, null),
-						meta: null,
-						name: name,
-						pos: v.expr.pos
-					}]);
-					v.expr = {
-						expr: EObjectDecl([{
-							field: name,
-							expr: v.expr
-						}]),
-						pos: v.expr.pos
-					};
-
-					varMap.set(name, true);
+	static function replaceVarsWithFinalStructs(varMap : Map<String, Bool>, e : Expr) switch e.expr {
+		case EVars(vars):
+			for(v in vars) {
+				if(v.expr == null) Context.error(
+					'var ${v.name} is immutable and must be assigned immediately.', e.pos
+				)
+				else {
+					replaceVarsWithFinalStructs(varMap, v.expr);
 				}
 
-			case EConst(CIdent(i)) if(varMap.exists(i)):
-				e.expr = (macro $p{[i,i]}).expr;
+				var name = v.name;
 
-			case EFunction(name, f):
-				iterateFunction(f);
+				var type = try {
+					if(v.type != null) v.type 
+					else Context.toComplexType(Context.typeof(v.expr));
+				}
+				catch(e : Dynamic) Context.error(
+					'No type information found, cannot make var $name immutable.', 
+					v.expr.pos
+				);
 
-			case EMeta(entry, {expr: EVars(vars), pos: _}) if(entry.name == "mutable"):
-				for(v in vars) 
-					replaceVarsWithFinalStructs(varMap, v.expr);
+				// var a : T = V    
+				// Becomes
+				// var a : { final a: T; } = {a: V}
 
-			case _:
-				//trace(e.expr);
-				e.iter(replaceVarsWithFinalStructs.bind(varMap));
-		}
+				v.type = TAnonymous([{
+					access: [AFinal],
+					doc: null,
+					kind: FVar(type, null),
+					meta: null,
+					name: name,
+					pos: v.expr.pos
+				}]);
+				v.expr = {
+					expr: EObjectDecl([{
+						field: name,
+						expr: v.expr
+					}]),
+					pos: v.expr.pos
+				};
+
+				varMap.set(name, true);
+			}
+
+		case EConst(CIdent(i)) if(varMap.exists(i)):
+			e.expr = (macro $p{[i,i]}).expr;
+
+		case EFunction(name, f):
+			iterateFunction(varMap, f);
+
+		case EMeta(entry, {expr: EVars(vars), pos: _}) if(entry.name == "mutable"):
+			for(v in vars) 
+				replaceVarsWithFinalStructs(varMap, v.expr);
+
+		case _:
+			//trace(e.expr);
+			e.iter(replaceVarsWithFinalStructs.bind(varMap));
 	}
 }
 #end
