@@ -24,29 +24,30 @@ class BuildImmutableClass
 		var cls : ClassType = Context.getLocalClass().get();
 		var buildFields = Context.getBuildFields();
 		
-		// Remove some optimizations to avoid mutable vars being modified by the compiler
-		//cls.meta.add(":analyzer", [macro no_local_dce], cls.pos);
-		//if(Context.defined("display")) return null;
-
 		for(field in buildFields) switch field.kind {
 			case FFun(f) if(f.expr != null):
-				iterateFunction(new Map<String, Bool>(), f);
+				iterateFunction(new Map<String, Bool>(), field.name, f);
 			case _:
 		}
 
 		return buildFields;
 	}
 
-	static function iterateFunction(currentImmutableVars : Map<String, Bool>, f : Function) {
+	static function iterateFunction(currentImmutableVars : Map<String, Bool>, name : Null<String>, f : Function) {
 		// Make a copy of current immutable vars
 		var immutableArgs = [for(key in currentImmutableVars.keys())
 			key => true
 		];
 		var mutableArgs = new Map<String, Bool>(); 
 		var hasImmutableArgs = false;
+
+		var isProbablyLambda = name == null && switch f.expr.expr {
+			case EReturn(e): true;
+			case _: false;
+		};
 		
 		for(arg in f.args) {
-			if(arg.meta == null || !arg.meta.exists(a -> a.name == "mutable")) {
+			if(!isProbablyLambda && (arg.meta == null || !arg.meta.exists(a -> a.name == "mutable"))) {
 				// If arg is immutable, add it to the map
 				immutableArgs.set(arg.name, true);
 				hasImmutableArgs = true;
@@ -70,7 +71,17 @@ class BuildImmutableClass
 			type: TAnonymous([{
 				access: [AFinal],
 				doc: null,
-				kind: FVar(arg.type, null),
+				kind: FVar(
+					if(arg.type != null) arg.type 
+					else try Context.toComplexType(Context.typeof(arg.value))
+					catch(e : Dynamic) {
+						Context.error(
+							'No type information found, cannot make ' + 
+							'function argument ${arg.name} immutable.', f.expr.pos
+						);
+						null;
+					}
+				, null),
 				meta: null,
 				name: arg.name,
 				pos: f.expr.pos
@@ -83,8 +94,6 @@ class BuildImmutableClass
 				pos: f.expr.pos
 			}
 		}]);
-
-		//trace("Immutable vars:"); trace(newVars); trace("-----------------");
 
 		var varExpr = { expr: newVars, pos: f.expr.pos };
 
@@ -115,10 +124,14 @@ class BuildImmutableClass
 					if(v.type != null) v.type 
 					else Context.toComplexType(Context.typeof(v.expr));
 				}
-				catch(e : Dynamic) Context.error(
-					'No type information found, cannot make var $name immutable.', 
-					v.expr.pos
-				);
+				catch(e : Dynamic) {
+					trace(ExprTools.toString(v.expr)); trace(e);
+					Context.error(
+						'No type information found, cannot make var $name immutable.', 
+						v.expr.pos
+					);
+					null;
+				}
 
 				// var a : T = V    
 				// Becomes
@@ -143,11 +156,11 @@ class BuildImmutableClass
 				varMap.set(name, true);
 			}
 
-		case EConst(CIdent(i)) if(varMap.exists(i)):
-			e.expr = (macro $p{[i,i]}).expr;
+		case EConst(CIdent(id)) if(varMap.exists(id)):
+			e.expr = (macro $p{[id,id]}).expr;
 
 		case EFunction(name, f):
-			iterateFunction(varMap, f);
+			iterateFunction(varMap, name, f);
 
 		case EMeta(entry, {expr: EVars(vars), pos: _}) if(entry.name == "mutable"):
 			for(v in vars) 

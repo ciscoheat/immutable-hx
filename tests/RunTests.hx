@@ -1,12 +1,9 @@
-//import buddy.CompilationShould;
 import sys.FileSystem;
 import haxe.io.Path;
 import sys.io.Process;
 
 using buddy.Should;
-
-// Every line in this file starting with TEST: should create a failure if uncommented.
-// This is tested with RunFailureTests.hx
+using Lambda;
 
 class RunTests extends buddy.SingleSuite
 {	
@@ -21,6 +18,8 @@ class RunTests extends buddy.SingleSuite
 				i.testFunctionVars().should.be("1test5");
 				i.testClosureVars().should.be("testclosure");
 				i.testMutableClosureVars().should.be("mutabletestclosure");
+				i.testShortLambdas().should.containExactly([1,2,3]);
+				i.testShortLambdasWithLocalImmutable().should.containExactly([1,2,3]);
 			});
 
 			it("should be able to make vars mutable with @mutable metadata", {
@@ -120,6 +119,27 @@ class LocalImmutable implements Immutable
 			return a + c;
 		}
 		return b("closure");
+	}
+
+	public function testLackOfTypeInformation() {
+		var a = [1,2,3,4,5,6,7];
+		@mutable var b = a.concat([8]);
+		return b;
+	}
+
+	public function testShortLambdas() {
+		var a = [1,2,3,4,5,6,7];
+		var b : Array<Int> = a.filter(i -> i < 4);
+		return b;
+	}
+
+	public function testShortLambdasWithLocalImmutable() {
+		var a = [1,2,3,4];
+		return a.filter(i -> {
+			i -= 1;
+			var j : Int = i * 10;
+			j < 30;
+		});
 	}
 
 	public function testComplexType() {

@@ -44,7 +44,25 @@ let b = 234;   | @mutable var b = 234;
 
 ## Limitations
 
-If the compiler cannot find any type information, it cannot make the var immutable and will fail compilation.
+### No type information
+
+If the compiler cannot find any type information, it cannot make the var immutable and will fail compilation. This can unfortunately be the case for even very simple assignments, like:
+
+```haxe
+var a = [1,2,3,4,5,6,7];
+var b = a.concat([8]); // Can't know what type a is, at this stage.
+```
+
+The way to fix it is to provide the type yourself:
+
+```haxe
+var a = [1,2,3,4,5,6,7];
+var b : Array<Int> = a.concat([8]);
+```
+
+### Short lambdas
+
+They are made to be short, so providing type information isn't convenient in this case. Therefore, if an unnamed function is returning as its first expression, it's considered to be a lambda and the arguments will be mutable. You can define immutable vars inside the function as usual.
 
 ## Problems?
 
