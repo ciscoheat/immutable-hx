@@ -44,7 +44,7 @@ let b = 234;   | @mutable var b = 234;
 
 ## Limitations
 
-If the compiler cannot find any type information, it cannot make the var immutable.
+If the compiler cannot find any type information, it cannot make the var immutable and will fail compilation.
 
 ## Problems?
 
