@@ -127,7 +127,7 @@ class BuildImmutableClass
 					else Context.toComplexType(Context.typeof(v.expr));
 				}
 				catch(e : Dynamic) {
-					trace(ExprTools.toString(v.expr)); trace(e);
+					//trace(ExprTools.toString(v.expr)); trace(e);
 					Context.error(
 						'No type information found, cannot make var $name immutable.', 
 						v.expr.pos
