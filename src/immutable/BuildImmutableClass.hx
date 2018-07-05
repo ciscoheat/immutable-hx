@@ -12,10 +12,15 @@ using haxe.macro.TypedExprTools;
 using Lambda;
 using StringTools;
 
+typedef VarMap = Map<String, ComplexType>;
+
 class BuildImmutableClass
 {
 	static function build() {
 		if(Context.defined("display")) return null;
+
+		//var e = macro (null : Array<Date>).map(f -> f.toString());
+		//trace(Context.typeof(e));
 		
 		var ver = Std.parseFloat(Context.getDefines().get('haxe_ver'));
 		if(ver < 4) Context.error("Immutable requires Haxe 4.", Context.currentPos());
@@ -28,20 +33,30 @@ class BuildImmutableClass
 		
 		for(field in buildFields) switch field.kind {
 			case FFun(f) if(f.expr != null):
-				iterateFunction(new Map<String, Bool>(), field.name, f);
+				iterateFunction(new VarMap(), field.name, f);
 			case _:
 		}
 
 		return buildFields;
 	}
 
-	static function iterateFunction(currentImmutableVars : Map<String, Bool>, name : Null<String>, f : Function) {
+	static function typeFromVarData(currentVars : VarMap, type : Null<ComplexType>, value : Null<Expr>) {
+		if(type != null) return type;
+
+		if(value != null) {
+			try return Context.toComplexType(Context.typeof(value)) 
+			catch(e : Dynamic) {}
+		}
+
+		return null;
+	}
+
+	static function iterateFunction(currentImmutableVars : VarMap, name : Null<String>, f : Function) {
 		// Make a copy of current immutable vars
-		var immutableArgs = [for(key in currentImmutableVars.keys())
-			key => true
-		];
-		var mutableArgs = new Map<String, Bool>(); 
 		var hasImmutableArgs = false;
+		var immutableArgs = [for(key in currentImmutableVars.keys())
+			key => currentImmutableVars[key]
+		];
 
 		var isProbablyLambda = name == null && switch f.expr.expr {
 			case EReturn(e): true;
@@ -51,24 +66,23 @@ class BuildImmutableClass
 		for(arg in f.args) {
 			if(!isProbablyLambda && (arg.meta == null || !arg.meta.exists(a -> a.name == "mutable"))) {
 				// If arg is immutable, add it to the map
-				immutableArgs.set(arg.name, true);
+				immutableArgs.set(arg.name, typeFromVarData(currentImmutableVars, arg.type, arg.value));
 				hasImmutableArgs = true;
 			} else {
 				// If arg is mutable, remove it from the copy of the
 				// current var lists, in case it exists in the outer scope.
-				mutableArgs.set(arg.name, true);
 				immutableArgs.remove(arg.name);
 			}
 		}
 
 		replaceVarsWithFinalStructs(immutableArgs, f.expr);
-		if(hasImmutableArgs) injectImmutableVarNames(mutableArgs, f);
+		if(hasImmutableArgs) injectImmutableVarNames(immutableArgs, f);
 	}
 
-	static function injectImmutableVarNames(mutables : Map<String, Bool>, f : Function) {
+	static function injectImmutableVarNames(immutables : VarMap, f : Function) {
 		//trace([for(m in mutables.keys()) m]);
 		// Add a var of the same name as the arg in the beginning of the function.
-		var newVars = EVars([for(arg in f.args) if(!mutables.exists(arg.name)) {
+		var newVars = EVars([for(arg in f.args) if(immutables.exists(arg.name)) {
 			name: arg.name,
 			type: TAnonymous([{
 				access: [AFinal],
@@ -110,7 +124,7 @@ class BuildImmutableClass
 		}
 	}
 
-	static function replaceVarsWithFinalStructs(varMap : Map<String, Bool>, e : Expr) switch e.expr {
+	static function replaceVarsWithFinalStructs(varMap : VarMap, e : Expr) switch e.expr {
 		case EVars(vars):
 			for(v in vars) {
 				if(v.expr == null) Context.error(
@@ -155,7 +169,7 @@ class BuildImmutableClass
 					pos: v.expr.pos
 				};
 
-				varMap.set(name, true);
+				varMap.set(name, type);
 			}
 
 		case EConst(CIdent(id)) if(varMap.exists(id)):
