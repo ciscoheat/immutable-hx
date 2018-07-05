@@ -46,18 +46,14 @@ let b = 234;   | @mutable var b = 234;
 
 ### No type information
 
-If the compiler cannot find any type information, it cannot make the var immutable and will fail compilation. This can unfortunately be the case for even very simple assignments, like:
+If the compiler cannot find any type information, it cannot make the var immutable and will fail compilation. The library does its best to alleviate this, but if it fails the way to fix it is to provide the type yourself:
 
 ```haxe
-var a = [1,2,3,4];
-var b = a.concat([5]); // Compiler doesn't recognize a here.
-```
+var a = [1,2,3,4]; // No problem, type inferred.
 
-The way to fix it is to provide the type yourself:
+var b = a.something(...); // Could fail compilation, no type information found.
 
-```haxe
-var a = [1,2,3,4];
-var b : Array<Int> = a.concat([5]);
+var c : Array<Int> = a.something(...); // No problem, type hint used.
 ```
 
 ### Short lambdas

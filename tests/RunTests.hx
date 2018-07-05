@@ -12,7 +12,9 @@ class RunTests extends buddy.SingleSuite
 			it("should be able to use assignments normally.", {
 				var i = new LocalImmutable();
 				i.testOneVar().should.be("ok");
+				i.testArgs("aaa").should.be("aaa");
 				i.testMultipleVars().should.be("123");
+				i.testReassignment().should.be(123);
 				i.testFunctions().should.be("testtest");
 				i.testComplexType().should.be("txt");
 				i.testFunctionVars().should.be("1test5");
@@ -84,8 +86,14 @@ class LocalImmutable implements Immutable
 	}
 
 	public function testArgs(a : String) {
-		//var b : {final b: String;} = {b: a};
-		//trace(a.a);
+		var b : {final b: String;} = {b: a};
+		return b.b;
+	}
+
+	public function testReassignment() {
+		var a = "ok";
+		var a = 123;
+		return a;
 	}
 
 	public function testFunctions() {
@@ -129,7 +137,7 @@ class LocalImmutable implements Immutable
 
 	public function testShortLambdas() {
 		var a = [1,2,3,4,5,6,7];
-		var b : Array<Int> = a.filter(i -> i < 4);
+		var b = a.filter(i -> i < 4);
 		return b;
 	}
 
@@ -143,7 +151,7 @@ class LocalImmutable implements Immutable
 	}
 
 	public function testComplexType() {
-		var b : haxe.io.Path = new haxe.io.Path("/test/file.txt");
+		var b = new haxe.io.Path("/test/file.txt");
 		return b.ext;
 	}
 

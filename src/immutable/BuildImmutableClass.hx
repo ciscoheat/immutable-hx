@@ -19,9 +19,6 @@ class BuildImmutableClass
 	static function build() {
 		if(Context.defined("display")) return null;
 
-		//var e = macro (null : Array<Date>).map(f -> f.toString());
-		//trace(Context.typeof(e));
-		
 		var ver = Std.parseFloat(Context.getDefines().get('haxe_ver'));
 		if(ver < 4) Context.error("Immutable requires Haxe 4.", Context.currentPos());
 
@@ -33,7 +30,7 @@ class BuildImmutableClass
 		
 		for(field in buildFields) switch field.kind {
 			case FFun(f) if(f.expr != null):
-				iterateFunction(new VarMap(), field.name, f);
+				iterateFunction(new VarMap(), field.name, f);				
 			case _:
 		}
 
@@ -42,13 +39,51 @@ class BuildImmutableClass
 
 	static function typeFromVarData(currentVars : VarMap, type : Null<ComplexType>, value : Null<Expr>) {
 		if(type != null) return type;
+		if(value == null) return null;
 
-		if(value != null) {
-			try return Context.toComplexType(Context.typeof(value)) 
-			catch(e : Dynamic) {}
+		// Try to convert the value into a type.
+		try return Context.toComplexType(Context.typeof(value)) 
+		catch(e : Dynamic) {}
+
+		/* 
+			Since that failed, replace existing immutable vars with their type, turning:
+
+			macro a.a.map(f -> f.toString())
+			into
+			macro (null : Array<Date>).map(f -> f.toString())
+
+			The compiler now knows how to resolve the type of this expression!
+		*/
+
+		var swapMap = new Map<Expr, ExprDef>();
+
+		function swapIdentifierWithType(e : Expr) switch e.expr {
+			// Look for "a.a" expressions that has an existing immutable var.
+			case EField({expr: EConst(CIdent(i)), pos: _}, field) if(field == i && currentVars.exists(i)):
+				var type = currentVars[i];
+				// Save old expr so it can be restored afterwards.
+				swapMap.set(e, e.expr);
+				e.expr = (macro (null : $type)).expr;
+			case _:
+				e.iter(swapIdentifierWithType);
 		}
 
-		return null;
+		function swapBack() {
+			// Restore swapped expressions
+			for(e in swapMap.keys()) {
+				e.expr = swapMap[e];
+			}
+		}
+
+		try {
+			swapIdentifierWithType(value);
+			var type = Context.toComplexType(Context.typeof(value));
+			swapBack();
+			return type;
+		} catch(e : Dynamic) {
+			swapBack();
+			return null;
+		}
 	}
 
 	static function iterateFunction(currentImmutableVars : VarMap, name : Null<String>, f : Function) {
