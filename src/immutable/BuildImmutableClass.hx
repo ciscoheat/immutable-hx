@@ -83,31 +83,30 @@ class BuildImmutableClass
 		//trace([for(m in mutables.keys()) m]);
 		// Add a var of the same name as the arg in the beginning of the function.
 		var newVars = EVars([for(arg in f.args) if(immutables.exists(arg.name)) {
-			name: arg.name,
-			type: TAnonymous([{
-				access: [AFinal],
-				doc: null,
-				kind: FVar(
-					if(arg.type != null) arg.type 
-					else try Context.toComplexType(Context.typeof(arg.value))
-					catch(e : Dynamic) {
-						Context.error(
-							'No type information found, cannot make ' + 
-							'function argument ${arg.name} immutable.', f.expr.pos
-						);
-						null;
-					}
-				, null),
-				meta: null,
-				name: arg.name,
-				pos: f.expr.pos
-			}]),
-			expr: {
-				expr: EObjectDecl([{
-					field: arg.name,
-					expr: macro $i{arg.name}
+			var name = arg.name;
+
+			var type = typeFromVarData(immutables, arg.type, arg.value);
+			if(type == null) Context.error(
+				'No type information found, cannot make function argument $name immutable.', f.expr.pos
+			);
+
+			{
+				name: name,
+				type: TAnonymous([{
+					access: [AFinal],
+					doc: null,
+					kind: FVar(type, null),
+					meta: null,
+					name: name,
+					pos: f.expr.pos
 				}]),
-				pos: f.expr.pos
+				expr: {
+					expr: EObjectDecl([{
+						field: name,
+						expr: macro $i{name}
+					}]),
+					pos: f.expr.pos
+				}
 			}
 		}]);
 
@@ -135,19 +134,11 @@ class BuildImmutableClass
 				}
 
 				var name = v.name;
+				var type = typeFromVarData(varMap, v.type, v.expr);
 
-				var type = try {
-					if(v.type != null) v.type 
-					else Context.toComplexType(Context.typeof(v.expr));
-				}
-				catch(e : Dynamic) {
-					//trace(ExprTools.toString(v.expr)); trace(e);
-					Context.error(
-						'No type information found, cannot make var $name immutable.', 
-						v.expr.pos
-					);
-					null;
-				}
+				if(type == null) Context.error(
+					'No type information found, cannot make var $name immutable.', v.expr.pos
+				);
 
 				// var a : T = V    
 				// Becomes
