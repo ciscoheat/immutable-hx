@@ -3,7 +3,6 @@ import haxe.io.Path;
 import sys.io.Process;
 
 using buddy.Should;
-using Lambda;
 
 class RunTests extends buddy.SingleSuite
 {	

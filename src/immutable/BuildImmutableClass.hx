@@ -7,23 +7,25 @@ import haxe.macro.Type;
 
 using haxe.macro.MacroStringTools;
 using haxe.macro.ExprTools;
-using haxe.macro.TypedExprTools;
-
 using Lambda;
-using StringTools;
 
 typedef VarMap = Map<String, ComplexType>;
 
 class BuildImmutableClass
 {
 	static function build() {
-		if(Context.defined("display")) return null;
-
-		var ver = Std.parseFloat(Context.getDefines().get('haxe_ver'));
-		if(ver < 4) Context.error("Immutable requires Haxe 4.", Context.currentPos());
+		// Display mode and vshaxe diagnostics don't need to use this.
+		if(Context.defined("display") || Context.defined("display-details")) 
+			return null;
 
 		if(Context.defined("disable-immutable") || Context.defined("immutable-disable"))
 			return null;
+
+		//var defines = Context.getDefines();
+		//for(key in defines.keys()) trace('$key = ' + defines[key]);
+
+		var ver = Std.parseFloat(Context.getDefines().get('haxe_ver'));
+		if(ver < 4) Context.error("Immutable requires Haxe 4.", Context.currentPos());
 
 		var cls : ClassType = Context.getLocalClass().get();
 		var buildFields = Context.getBuildFields();
