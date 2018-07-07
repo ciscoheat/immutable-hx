@@ -21,6 +21,7 @@ class RunTests extends buddy.SingleSuite
 				i.testMutableClosureVars().should.be("mutabletestclosure");
 				i.testShortLambdas().should.containExactly([1,2,3]);
 				i.testShortLambdasWithLocalImmutable().should.containExactly([1,2,3]);
+				i.testMutableUndefinedVar().should.beGreaterThan(123);
 			});
 
 			it("should be able to make vars mutable with @mutable metadata", {
@@ -117,6 +118,12 @@ class LocalImmutable implements Immutable
 			return a + c;
 		}
 		return b("closure");
+	}
+
+	public function testMutableUndefinedVar() {
+		@mutable var a;
+		a = 123.00 + Math.random();
+		return a;
 	}
 
 	public function testMutableClosureVars() {

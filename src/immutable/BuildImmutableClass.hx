@@ -13,6 +13,9 @@ typedef VarMap = Map<String, ComplexType>;
 
 class BuildImmutableClass
 {
+	/**
+	 *  Entry point. Do some basic checks and then iterate all build fields.
+	 */
 	static function build() {
 		// Display mode and vshaxe diagnostics don't need to use this.
 		if(Context.defined("display") || Context.defined("display-details")) 
@@ -21,13 +24,9 @@ class BuildImmutableClass
 		if(Context.defined("disable-immutable") || Context.defined("immutable-disable"))
 			return null;
 
-		//var defines = Context.getDefines();
-		//for(key in defines.keys()) trace('$key = ' + defines[key]);
-
 		var ver = Std.parseFloat(Context.getDefines().get('haxe_ver'));
 		if(ver < 4) Context.error("Immutable requires Haxe 4.", Context.currentPos());
 
-		var cls : ClassType = Context.getLocalClass().get();
 		var buildFields = Context.getBuildFields();
 		
 		for(field in buildFields) switch field.kind {
@@ -39,6 +38,12 @@ class BuildImmutableClass
 		return buildFields;
 	}
 
+	/**
+	 *  Try to get the type from what we know about a var.
+	 *  @param currentVars - Currently defined immutable vars
+	 *  @param type - Var type hint
+	 *  @param value - Var assignment
+	 */
 	static function typeFromVarData(currentVars : VarMap, type : Null<ComplexType>, value : Null<Expr>) {
 		if(type != null) return type;
 		if(value == null) return null;
@@ -88,6 +93,13 @@ class BuildImmutableClass
 		}
 	}
 
+	/**
+	 *  Determine which arguments are immutable in a function, then inject new immutable vars 
+	 *  as a replacement, and parse the rest of the function for local immutable vars.
+	 *  @param currentImmutableVars - Currently defined immutable vars
+	 *  @param name - Function name
+	 *  @param f - The function AST
+	 */
 	static function iterateFunction(currentImmutableVars : VarMap, name : Null<String>, f : Function) {
 		// Make a copy of current immutable vars
 		var hasImmutableArgs = false;
@@ -113,12 +125,16 @@ class BuildImmutableClass
 		}
 
 		replaceVarsWithFinalStructs(immutableArgs, f.expr);
-		if(hasImmutableArgs) injectImmutableVarNames(immutableArgs, f);
+		if(hasImmutableArgs) injectImmutableArgNames(immutableArgs, f);
 	}
 
-	static function injectImmutableVarNames(immutables : VarMap, f : Function) {
-		//trace([for(m in mutables.keys()) m]);
-		// Add a var of the same name as the arg in the beginning of the function.
+	/**
+	 *  Add a var of the same name as the arg in the beginning of the function, 
+	 *  to prevent modifications of the argument.
+	 *  @param immutables - Currently defined immutable vars
+	 *  @param f - Function AST
+	 */
+	static function injectImmutableArgNames(immutables : VarMap, f : Function) {
 		var newVars = EVars([for(arg in f.args) if(immutables.exists(arg.name)) {
 			var name = arg.name;
 
@@ -160,6 +176,18 @@ class BuildImmutableClass
 		}
 	}
 
+	/**
+	 *  Replace local vars with an anonymous structure containing a field that is final.
+	 *  
+	 *  var a : T = V
+	 *  Becomes
+	 *  var a : { final a: T; } = {a: V}
+	 *  
+	 *  And all future references to "a" are changed to "a.a"
+	 *  
+	 *  @param varMap - Currently defined immutable vars
+	 *  @param e - Expression to parse
+	 */
 	static function replaceVarsWithFinalStructs(varMap : VarMap, e : Expr) switch e.expr {
 		case EVars(vars):
 			for(v in vars) {
@@ -176,10 +204,6 @@ class BuildImmutableClass
 				if(type == null) Context.error(
 					'No type information found, cannot make var $name immutable.', v.expr.pos
 				);
-
-				// var a : T = V    
-				// Becomes
-				// var a : { final a: T; } = {a: V}
 
 				v.type = TAnonymous([{
 					access: [AFinal],
@@ -207,11 +231,10 @@ class BuildImmutableClass
 			iterateFunction(varMap, name, f);
 
 		case EMeta(entry, {expr: EVars(vars), pos: _}) if(entry.name == "mutable"):
-			for(v in vars) 
+			for(v in vars) if(v.expr != null)
 				replaceVarsWithFinalStructs(varMap, v.expr);
 
 		case _:
-			//trace(e.expr);
 			e.iter(replaceVarsWithFinalStructs.bind(varMap));
 	}
 }
