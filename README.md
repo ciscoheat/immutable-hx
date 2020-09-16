@@ -1,3 +1,7 @@
+# Deprecation notice
+
+Haxe 4 now has `final` as a replacement for `var`, making this library redundant.
+
 # Immutable
 
 A Haxe 4 library for making your local vars immutable with
